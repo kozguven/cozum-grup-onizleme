@@ -53,7 +53,7 @@ const ihTag = i => tag(durAd(i), { hazirlaniyor: 'w', teklif: 'b', kazanildi: 'g
 const emTag = e => tag(EMIR_DURUM[e.durum], { planlandi: 'w', uretimde: 'b', tamamlandi: 'g' }[e.durum]);
 const paTag = p => tag(PARTI_DURUM[p.durum], { kalite: 'a', onay: 'g', red: 'r' }[p.durum]);
 const svTag = v => tag(SEVK_DURUM[v.durum], { hazirlaniyor: 'w', yolda: 'b', teslim: 'g' }[v.durum]);
-const szTag = z => sozBitti(z) ? tag('Tamamlandı', 'g') : tag('Devam ediyor', 'b');
+const szTag = z => z.kapanis ? tag('Dosya kapandı', 'g') : sozBitti(z) ? tag('Tamamlandı', 'g') : tag('Devam ediyor', 'b');
 const prog = (o, cls) => `<div class="prog"><div class="bar ${o >= 1 ? 'ok' : ''} ${cls || ''}"><i style="width:${Math.min(100, o * 100).toFixed(0)}%"></i></div><span>%${Math.round(o * 100)}</span></div>`;
 const sirCol = x => aktifSir() === 'hepsi' ? `<div class="small muted">${esc(sirket(x.sir).kisa)}</div>` : '';
 const sirNote = () => aktifSir() === 'hepsi' ? '<div class="note">Tüm şirketlerin kayıtları birlikte gösteriliyor. Yeni kayıtlar Çözüm Kimya adına açılır; tek şirket seçerek çalışabilirsiniz.</div>' : '';
@@ -62,6 +62,56 @@ function bindClicks(el) { $$('[data-go]', el || view).forEach(x => x.onclick = e
 const kurumAd = id => esc(kurum(id).ad);
 const turTag = t => `<span class="small muted">${esc(turAd(t))}</span>`;
 const turSeg = (cur, cnt) => `<div class="seg" id="turSeg">${[['hepsi', 'Tüm işler'], ...Object.entries(TUR)].map(([k, ad]) => `<button data-t="${k}" class="${cur === k ? 'on' : ''}">${ad} (${cnt(k)})</button>`).join('')}</div>`;
+
+/* ---- v4 ortak parçalar: ürün görseli, kalem kartı, teslim yeri notları, dağılım tablosu ---- */
+const basHarf = ad => ad.split(' ').filter(w => /^[A-ZÇĞİÖŞÜ]/.test(w)).slice(0, 2).map(w => w[0]).join('');
+const urunImg = (uid, amb) => { const u = urun(uid); return `<span class="uimg ${u.grup === 'Toz' ? 'toz' : ''}" aria-hidden="true"><b>${esc(basHarf(u.ad))}</b><small>${esc((amb || AMB[uid] || '').split(' ').slice(0, 2).join(' '))}</small></span>`; };
+function kalemKart(x, opt) {
+  opt = opt || {};
+  return `<div class="kk">${urunImg(x.uid, x.amb)}<div><b>${esc(urun(x.uid).ad)}</b><div class="small muted">İhale ambalajı: <b>${esc(x.amb || AMB[x.uid])}</b>${x.dosya ? ', şartname: ' + esc(x.dosya) : ''}</div>
+    ${opt.kisa ? '' : `<ul class="sart">${(x.sartname || []).map(m => `<li>${esc(m)}</li>`).join('')}</ul>`}</div></div>`;
+}
+function uyusmaz(x, uidSecilen) {
+  if (!uidSecilen || uidSecilen === x.uid) return '';
+  const a1 = x.amb || AMB[x.uid], a2 = AMB[uidSecilen], u1 = urun(x.uid).ad.replace(/ \d.*$/, ''), u2 = urun(uidSecilen).ad.replace(/ \d.*$/, '');
+  return `İhale kalemiyle uyuşmuyor: ihalede "${urun(x.uid).ad}" (${a1}), seçilen "${urun(uidSecilen).ad}" (${a2}).${u1 === u2 ? ' Ürün aynı, ambalaj farklı.' : ' Ürün farklı.'}`;
+}
+function notKutu(tyId, baslik) {
+  const t = tyBy(tyId); if (!t) return '';
+  const son = t.notlar.slice().sort((a, b) => b.tarih.localeCompare(a.tarih)).slice(0, 4);
+  return `<div class="sari" id="notKutu"><b>${esc(baslik || 'Teslim yeri hafızası')}: ${esc(t.ad)}</b>
+    <div class="small">Mal kabul: ${esc(t.saat)}. ${t.forklift ? 'Forklift var.' : '<b>Forklift yok.</b>'} ${esc(t.rampa)}. ${t.hamaliye ? 'Hamaliye yaklaşık ' + (F ? money0(t.hamaliye) : 'ücretli') + '.' : ''} Yetkili: ${esc(t.yetkili)}, ${esc(t.tel)}</div>
+    ${son.map(n => `<div class="small" style="margin-top:4px">${n.uyari ? '<b>Uyarı.</b> ' : ''}Önceki ${n.kaynak === 'fatura' ? 'fatura tesliminden' : n.kaynak === 'kart' ? 'kayıttan' : 'sevkiyattan'} not (${trDate(n.tarih)}): ${esc(n.metin)}</div>`).join('')}</div>`;
+}
+function dagilimTablo(r, isSoz, editable) {
+  const tys = Object.keys(r.dagilim || {}), kurTy = S.teslimYerleri.filter(t => t.k === r.k && !tys.includes(t.id)), hata = dagHata(r);
+  if (!tys.length && !S.teslimYerleri.some(t => t.k === r.k)) return '';
+  const cell = (ty, x) => { const d = (r.dagilim[ty] || {})[x.uid] || 0;
+    const inp = editable ? `<input class="inp sm num" data-dg="${ty}|${x.uid}" value="${d || ''}" placeholder="0" style="width:84px" aria-label="${esc(tyBy(ty).ad)} ${esc(urun(x.uid).ad)}">` : `<b class="num">${nf(d)}</b>`;
+    if (!isSoz) return inp;
+    const tes = teslimEdilen(r, x.uid, ty), yol = yoldaTy(r, x.uid, ty), kal = d - tes - yol;
+    return `${inp}<div class="small muted nowrap" data-dk="${ty}|${x.uid}">Teslim ${nf(tes)}${yol ? ', yolda ' + nf(yol) : ''}, kalan <b class="${kal < 0 ? 'bad' : ''}">${nf(kal)}</b></div>`; };
+  return `<div class="card" id="dagilim"><div class="card-h"><h2>Teslim yerlerine dağılım</h2><span class="small muted">${isSoz ? 'Her teslim yeri ve kalem için gönderilen ve kalan' : 'İl müdürlüğü ihaleyi yapar, ürünler ilçe hastanelerine dağıtılır'}</span></div>
+    ${hata.length ? `<div class="note w" id="dagUyari"><b>Dağılım ana miktarla tutmuyor:</b> ${hata.map(x => `${esc(urun(x.uid).ad)} için dağıtılan ${nf(dagToplam(r, x.uid))}, ana miktar ${nf(x.mik)} (fark ${nf(x.mik - dagToplam(r, x.uid))})`).join('; ')}.</div>` : tys.length ? '<div class="small ok" style="margin-bottom:8px" id="dagTamam">Dağılım toplamları ana miktarlarla tutuyor.</div>' : ''}
+    ${tys.length ? `<div class="tw"><table class="t"><thead><tr><th>Teslim yeri</th>${r.kalemler.map(x => `<th class="r">${esc(urun(x.uid).ad)}</th>`).join('')}${editable ? '<th></th>' : ''}</tr></thead><tbody>
+      ${tys.map(ty => `<tr><td><a href="#kurumlar/ty-${ty}">${esc(tyBy(ty).ad)}</a></td>${r.kalemler.map(x => `<td class="r">${cell(ty, x)}</td>`).join('')}${editable ? `<td class="r"><button class="linkbtn" data-dgrm="${ty}">Çıkar</button></td>` : ''}</tr>`).join('')}</tbody>
+      <tfoot><tr><td>Dağıtılan / ana miktar</td>${r.kalemler.map(x => { const t = dagToplam(r, x.uid); return `<td class="r ${t !== x.mik ? 'bad' : 'ok'}" data-dt="${x.uid}">${nf(t)} / ${nf(x.mik)}${isSoz ? `<div class="small muted">teslim ${nf(teslimEdilen(r, x.uid))}, kalan ${nf(x.mik - teslimEdilen(r, x.uid))}</div>` : ''}</td>`; }).join('')}${editable ? '<td></td>' : ''}</tr></tfoot></table></div>` : '<p class="empty">Henüz dağılım girilmedi.</p>'}
+    ${editable && kurTy.length ? `<div class="acts" style="margin-top:10px"><select class="inp sm" id="dgAdd" aria-label="Teslim yeri">${kurTy.map(t => `<option value="${t.id}">${esc(t.ad)}</option>`).join('')}</select><button class="btn sm alt" id="dgAddB">Teslim yeri ekle</button></div>` : ''}</div>`;
+}
+function bindDagilim(r) {
+  $$('[data-dg]').forEach(i => i.onchange = () => { const [ty, uid] = i.dataset.dg.split('|'); r.dagilim[ty] = r.dagilim[ty] || {}; r.dagilim[ty][uid] = num(i.value) || 0; save(); const y = window.scrollY; route(); window.scrollTo(0, y); });
+  $$('[data-dgrm]').forEach(b => b.onclick = () => { delete r.dagilim[b.dataset.dgrm]; save(); const y = window.scrollY; route(); window.scrollTo(0, y); });
+  const b = $('#dgAddB'); if (b) b.onclick = () => { r.dagilim = r.dagilim || {}; r.dagilim[$('#dgAdd').value] = {}; save(); const y = window.scrollY; route(); window.scrollTo(0, y); };
+}
+function teknikModal(x, after) {
+  modal('Kalem teknik bilgisi: ' + urun(x.uid).ad, `${kalemKart(x, { kisa: true })}
+    <label class="f" style="margin-top:12px"><span>Ambalaj (litre / kg)</span><input class="inp" id="tamb" value="${esc(x.amb || '')}"></label>
+    <label class="f"><span>Teknik şartname maddeleri (her satır bir madde)</span><textarea class="inp" id="tsart" rows="4">${esc((x.sartname || []).join('\n'))}</textarea></label>
+    <label class="f"><span>Şartname dosyası</span><input class="inp" id="tdos" value="${esc(x.dosya || '')}"></label>
+    <div class="foot"><button class="btn alt" data-close>Vazgeç</button><button class="btn" id="tok2">Kaydet</button></div>`, m => {
+    $('#tok2', m).onclick = () => { x.amb = $('#tamb', m).value.trim(); x.sartname = $('#tsart', m).value.split('\n').map(t => t.trim()).filter(Boolean); x.dosya = $('#tdos', m).value.trim(); save(); m.remove(); toast('Teknik bilgi kaydedildi.'); after(); };
+  });
+}
 
 /* ============ GENEL BAKIŞ ============ */
 ROUTES.ozet = function () {
@@ -274,10 +324,11 @@ function ihaleDetay(id) {
       <div><small>Teklifimiz (KDV hariç)</small><b class="num">${money0(top)}</b>${i.yaklasik && top ? `<div class="small muted">Yaklaşık maliyetin %${nf(Math.abs(fark), 1)} ${fark < 0 ? 'altında' : 'üstünde'}</div>` : ''}</div>` : ''}
     </div>
     <div class="card"><div class="card-h"><h2>Kalemler</h2>${ed ? '<span class="small muted">Teklif verilene kadar düzenlenebilir</span>' : ''}</div>
-      ${tbl([['Ürün'], ['Miktar', 'r'], ...(F ? [['Birim teklif', 'r'], ['Tutar', 'r']] : []), ...(M ? [['Birim maliyet', 'r'], ['Marj', 'r']] : []), ...(ed ? [['', 'r']] : [])],
-        i.kalemler.map((x, n) => { const bmv = birimMaliyet(x.uid); return `<tr><td data-l="Ürün">${esc(urun(x.uid).ad)}</td><td data-l="Miktar" class="r num">${nf(x.mik)} adet</td>
+      ${tbl([['Ürün ve ambalaj'], ['Miktar', 'r'], ...(F ? [['Birim teklif', 'r'], ['Tutar', 'r']] : []), ...(M ? [['Birim maliyet', 'r'], ['Marj', 'r']] : []), ['Teknik', 'r'], ...(ed ? [['', 'r']] : [])],
+        i.kalemler.map((x, n) => { const bmv = birimMaliyet(x.uid); return `<tr><td data-l="Ürün"><div class="kk">${urunImg(x.uid, x.amb)}<div>${esc(urun(x.uid).ad)}<div class="small muted">${esc(x.amb || '')}, ${(x.sartname || []).length} şartname maddesi</div></div></div></td><td data-l="Miktar" class="r num">${nf(x.mik)} adet</td>
           ${F ? `<td data-l="Birim teklif" class="r num">${money(x.fiyat)}</td><td data-l="Tutar" class="r num">${money0(x.mik * x.fiyat)}</td>` : ''}
           ${M ? `<td data-l="Birim maliyet" class="r num">${money(bmv)}</td><td data-l="Marj" class="r">%${nf((1 - bmv / x.fiyat) * 100, 1)}</td>` : ''}
+          <td data-l="Teknik" class="r"><button class="linkbtn" data-tek="${n}">Teknik bilgi</button></td>
           ${ed ? `<td class="r"><button class="linkbtn" data-rm="${n}">Sil</button></td>` : ''}</tr>`; }), 'Henüz kalem eklenmedi.')}
       ${ed ? `<div class="acts" style="margin-top:12px">
         <select class="inp sm" id="ku" aria-label="Ürün">${S.urunler.map(u => `<option value="${u.id}">${esc(u.ad)}</option>`).join('')}</select>
@@ -285,6 +336,7 @@ function ihaleDetay(id) {
         <input class="inp sm" id="kf" placeholder="Birim fiyat ₺" inputmode="decimal" style="width:120px" aria-label="Birim fiyat">
         <button class="btn sm" id="kadd">Kalem ekle</button></div>` : ''}
     </div>
+    ${i.tur !== 'piyasa' ? dagilimTablo(i, false, i.durum !== 'kaybedildi' && !i.sozId) : ''}
     <div class="grid2e" style="margin-top:14px">
       <div class="card"><div class="card-h"><h2>Evrak listesi</h2><span class="small muted" id="evs">${i.evrak.filter(e => e.ok).length}/${i.evrak.length} hazır</span></div>
         ${i.evrak.map((e, n) => `<label class="chk"><input type="checkbox" data-ev="${n}" ${e.ok ? 'checked' : ''}><span>${esc(e.ad)}</span></label>`).join('')}</div>
@@ -311,7 +363,9 @@ function ihaleDetay(id) {
   $$('[data-ev]').forEach(c => c.onchange = () => { i.evrak[c.dataset.ev].ok = c.checked; save(); $('#evs').textContent = i.evrak.filter(e => e.ok).length + '/' + i.evrak.length + ' hazır'; });
   $('#rkSave').onclick = () => { i.rakip = $('#rakip').value; save(); toast('Not kaydedildi.'); };
   const on = (q, f) => { const b = $(q); if (b) b.onclick = f; };
-  on('#kadd', () => { const mik = num($('#km').value), fy = numIn($('#kf').value); if (!(mik > 0) || !(fy > 0)) return toast('Miktar ve birim fiyat girin.'); i.kalemler.push({ uid: $('#ku').value, mik, fiyat: fy }); save(); route(); });
+  on('#kadd', () => { const mik = num($('#km').value), fy = numIn($('#kf').value); if (!(mik > 0) || !(fy > 0)) return toast('Miktar ve birim fiyat girin.'); i.kalemler.push(Object.assign({ uid: $('#ku').value, mik, fiyat: fy }, kalemTek($('#ku').value, i.ikn))); save(); route(); });
+  $$('[data-tek]').forEach(b => b.onclick = () => teknikModal(i.kalemler[+b.dataset.tek], route));
+  bindDagilim(i);
   $$('[data-rm]').forEach(b => b.onclick = () => { i.kalemler.splice(+b.dataset.rm, 1); save(); route(); });
   on('#aTeklif', () => { if (!i.kalemler.length) return toast('Önce en az bir kalem ekleyin.'); i.durum = 'teklif'; save(); toast('Teklif verildi. Sonuç açıklanınca Kazanıldı veya Kaybedildi deyin.'); route(); });
   on('#aKaz', () => { i.durum = 'kazanildi'; i.sonuc = TODAY; save(); toast(pi ? 'Sipariş alındı. Şimdi sipariş kaydını oluşturun.' : 'Kazanıldı. Şimdi sözleşmeyi oluşturun.'); route(); });
@@ -341,6 +395,7 @@ function sozModal(i) {
       const n = +$('#tsay', m).value, ara = parseInt($('#tara', m).value) || 30, ilk = $('#tilk', m).value;
       const z = { id: 'sz' + S.seq.soz + 'x' + Date.now() % 1000, no: $('#szno', m).value, sir: i.sir, ihId: i.id, k: i.k, tur: i.tur || 'acik', tarih: $('#sztar', m).value, kalemler: JSON.parse(JSON.stringify(i.kalemler)),
         plan: Array.from({ length: n }, (_, j) => ({ tarih: addDays(ilk, j * ara), not: (j + 1) + '. teslim, %' + nf(100 / n, 0) })),
+        dagilim: JSON.parse(JSON.stringify(i.dagilim || {})), degisiklik: [], ekTeminat: [], kapanis: null,
         kesin: ac ? { tur: $('#kttur', m).value, tutar: num($('#ktt', m).value) || 0, banka: $('#ktb', m).value, no: $('#ktno', m).value, verilis: $('#sztar', m).value, iade: false, iadeTarih: null, talep: null } : null };
       if ($('#szdam', m)) i.gider.damga = num($('#szdam', m).value) || 0; if ($('#szkar', m)) i.gider.karar = num($('#szkar', m).value) || 0;
       S.sozlesmeler.push(z); i.sozId = z.id; save(); m.remove(); toast('Kayıt oluşturuldu. Buradan üretim emri verebilirsiniz.'); location.hash = 'sozlesmeler/' + z.id;
@@ -351,6 +406,7 @@ function sozModal(i) {
 /* ============ SÖZLEŞMELER ============ */
 let szF = 'aktif', szT = 'hepsi';
 ROUTES.sozlesmeler = function (id) {
+  if (id && id.startsWith('kapanis-') && soz(id.slice(8))) return sozKapanis(id.slice(8));
   if (id && soz(id)) return sozDetay(id);
   const all0 = S.sozlesmeler.filter(inSir), all = all0.filter(z => szT === 'hepsi' || z.tur === szT);
   const list = all.filter(z => szF === 'hepsi' || (szF === 'aktif' ? !sozBitti(z) : sozBitti(z))).sort((a, b) => b.tarih.localeCompare(a.tarih));
@@ -375,20 +431,22 @@ function sozDetay(id) {
   const sevkCiro = svs.reduce((t, v) => t + svCiro(v), 0), nk = k => svs.reduce((t, v) => t + (v.nakliye[k] || 0), 0);
   view.innerHTML = `<a class="back" href="#sozlesmeler">Sözleşme ve siparişlere dön</a>
     <div class="hd"><div><h1>${esc(z.no)}, ${kurumAd(z.k)}</h1><p>${szTag(z)} &nbsp; ${esc(turAd(z.tur))}, tarih ${trDate(z.tarih)}</p></div>
-      <div class="acts">${can('uretim') && !sozBitti(z) ? '<button class="btn" id="aEmir">Üretim emri oluştur</button>' : ''}${can('sevkiyat') && !sozBitti(z) ? `<a class="btn alt" href="#sevkiyat/yeni-${z.id}">Sevkiyat oluştur</a>` : ''}</div></div>
+      <div class="acts">${can('uretim') && !sozBitti(z) && !z.kapanis ? '<button class="btn" id="aEmir">Üretim emri oluştur</button>' : ''}${can('sevkiyat') && !sozBitti(z) && !z.kapanis ? `<a class="btn alt" href="#sevkiyat/yeni-${z.id}">Sevkiyat oluştur</a>` : ''}<a class="btn ${z.kapanis ? 'alt' : 'acc'}" href="#sozlesmeler/kapanis-${z.id}" id="aKapanis">${z.kapanis ? 'Kapanış özeti' : 'Dosyayı kapat'}</a></div></div>
     <div class="meta">
       <div><small>${noEtiket(z.tur)}</small><b>${can('ihaleler') ? `<a href="#ihaleler/${z.ihId}">${esc(ihale(z.ihId).ikn)}</a>` : esc(ihale(z.ihId).ikn)}</b></div>
       <div><small>Şirket</small><b>${esc(sirket(z.sir).kisa)}</b></div>
-      ${F ? `<div><small>Sözleşme tutarı (KDV hariç)</small><b class="num">${money0(sozTutar(z))}</b></div>` : ''}
+      ${F ? `<div><small>Güncel sözleşme bedeli (KDV hariç)</small><b class="num">${money0(guncelBedel(z))}</b>${degNet(z) ? `<div class="small muted">Ana bedel ${money0(sozTutar(z))}</div>` : ''}</div>` : ''}
       <div><small>Genel teslim</small>${prog(sozOran(z))}</div>
       ${F && svs.length ? `<div><small>Nakliye / ana fatura tutarı</small><b class="num" id="szOran">${pct(sevkCiro ? nak / sevkCiro : 0)}</b><div class="small muted">${money0(nak)} / ${money0(sevkCiro)}</div></div>` : ''}
     </div>
     <div class="card"><h2>Kalemler ve teslim durumu</h2>
-      ${tbl([['Ürün'], ['Sözleşme', 'r'], ['Teslim edilen', 'r'], ['Yolda / hazırlanıyor', 'r'], ['Kalan', 'r'], ['İlerleme'], ...(F ? [['Birim fiyat', 'r'], ['Tutar', 'r']] : [])],
-        z.kalemler.map(x => { const t = teslimEdilen(z, x.uid), y = yoldaMik(z, x.uid); return `<tr><td data-l="Ürün">${esc(urun(x.uid).ad)}</td><td data-l="Sözleşme" class="r num">${nf(x.mik)}</td>
-          <td data-l="Teslim edilen" class="r num">${nf(t)}</td><td data-l="Yolda" class="r num">${nf(y)}</td><td data-l="Kalan" class="r num"><b>${nf(Math.max(0, x.mik - t))}</b></td>
-          <td data-l="İlerleme" style="min-width:130px">${prog(t / x.mik)}</td>${F ? `<td data-l="Birim fiyat" class="r num">${money(x.fiyat)}</td><td data-l="Tutar" class="r num">${money0(x.mik * x.fiyat)}</td>` : ''}</tr>`; }))}
+      ${tbl([['Ürün ve ambalaj'], ['Sözleşme', 'r'], ['Teslim edilen (kabul)', 'r'], ['Muayenede ret', 'r'], ['Yolda / hazırlanıyor', 'r'], ['Kalan', 'r'], ['İlerleme'], ...(F ? [['Birim fiyat', 'r'], ['Tutar', 'r']] : []), ['', 'r']],
+        z.kalemler.map((x, n) => { const t = teslimEdilen(z, x.uid), y = yoldaMik(z, x.uid), rd = reddedilen(z, x.uid); return `<tr><td data-l="Ürün"><div class="kk">${urunImg(x.uid, x.amb)}<div>${esc(urun(x.uid).ad)}<div class="small muted">${esc(x.amb || '')}</div></div></div></td><td data-l="Sözleşme" class="r num">${nf(x.mik)}</td>
+          <td data-l="Teslim edilen" class="r num">${nf(t)}</td><td data-l="Ret" class="r num ${rd ? 'bad' : ''}">${nf(rd)}</td><td data-l="Yolda" class="r num">${nf(y)}</td><td data-l="Kalan" class="r num"><b>${nf(Math.max(0, x.mik - t))}</b></td>
+          <td data-l="İlerleme" style="min-width:130px">${prog(t / x.mik)}</td>${F ? `<td data-l="Birim fiyat" class="r num">${money(x.fiyat)}</td><td data-l="Tutar" class="r num">${money0(x.mik * x.fiyat)}</td>` : ''}<td class="r"><button class="linkbtn" data-tek="${n}">Teknik bilgi</button></td></tr>`; }))}
     </div>
+    ${dagVar(z) || S.teslimYerleri.some(t => t.k === z.k) && z.tur === 'acik' ? dagilimTablo(z, true, !z.kapanis) : ''}
+    ${bedelKart(z)}
     <div class="grid2e" style="margin-top:14px">
       <div class="card"><h2>Teslim takvimi</h2>
         ${z.plan.map(p => { const d = diffDays(p.tarih, TODAY); return `<div class="uy ${d < 0 && !sozBitti(z) ? '' : ''}"><span>${esc(p.not)}</span><span class="t">${trDate(p.tarih)}, ${d < 0 ? 'geçti' : gunTxt(p.tarih)}</span></div>`; }).join('')}
@@ -414,6 +472,9 @@ function sozDetay(id) {
       <div class="card"><h2>Sevkiyatlar</h2>${svs.map(v => `<div class="uy"><a href="#sevkiyat/${v.id}">${esc(v.no)}, ${trDate(v.tarih)}</a>${svTag(v)}</div>`).join('') || '<p class="empty">Henüz sevkiyat yok.</p>'}</div>
     </div>`;
   const b = $('#aEmir'); if (b) b.onclick = () => emirModal(z.id);
+  $$('[data-tek]').forEach(x => x.onclick = () => teknikModal(z.kalemler[+x.dataset.tek], route));
+  bindDagilim(z);
+  const de = $('#degEkle'); if (de) de.onclick = () => degModal(z);
   const k = $('#kIade'); if (k) k.onclick = () => { z.kesin.iade = true; z.kesin.iadeTarih = TODAY; save(); toast('Kesin teminat iade alındı; kurum carisinden düşüldü.'); route(); };
 }
 function emirModal(szId) {
@@ -435,6 +496,7 @@ function emirModal(szId) {
 
 /* ============ KURUMLAR ============ */
 ROUTES.kurumlar = function (id) {
+  if (id && id.startsWith('ty-') && tyBy(id.slice(3))) return tyKart(id.slice(3));
   if (id && kurum(id)) return kurumDetay(id);
   view.innerHTML = `<div class="hd"><div><h1>Kurumlar ve müşteriler</h1><p>Kamu kurumları ve piyasa müşteri firmaları; ihaleleri, siparişleri, sevkiyatları ve alacakları tek yerde.</p></div><button class="btn" id="yk">Yeni kurum / müşteri</button></div>
     <div class="card">${tbl([['Kurum / müşteri'], ['Tür'], ['İl'], ['İhale'], ['Aktif sözleşme'], ['Ödeme vadesi'], ...(F ? [['Alacak', 'r']] : [])],
@@ -458,12 +520,119 @@ function kurumDetay(id) {
     <div class="hd"><div><h1>${esc(k.ad)}</h1><p>${k.tip === 'firma' ? 'Piyasa müşterisi' : 'Kamu kurumu'}, ${esc(k.il)}, ödeme vadesi ${k.vade} gün</p></div>${F && can('fatura') ? `<a class="btn alt" href="belge.html?tip=ekstre&id=${k.id}">Kurum ekstresi</a>` : ''}</div>
     <div class="meta"><div><small>Yetkili</small><b>${esc(k.yetkili)}</b></div><div><small>Telefon</small><b>${esc(k.tel)}</b></div><div><small>VKN</small><b>${esc(k.vkn)}</b></div>
       ${F ? `<div><small>Fatura alacağı</small><b class="num">${money0(ft.reduce((t, f) => t + kalanF(f), 0))}</b></div><div><small>Teminat alacağı (kurumda bekleyen)</small><b class="num" id="kTem">${money0(teminatAlacak(k.id))}</b></div>` : ''}</div>
+    <div class="card" style="margin-bottom:14px"><div class="card-h"><h2>Teslim yerleri (hastane, depo)</h2><button class="btn sm alt" id="tyEkle">Teslim yeri ekle</button></div>
+      ${S.teslimYerleri.filter(t => t.k === k.id).map(t => `<div class="uy ${t.notlar.some(n => n.uyari) ? 'al' : ''}"><span><a href="#kurumlar/ty-${t.id}">${esc(t.ad)}</a><br><span class="small muted">${esc(t.yetkili)}, ${esc(t.saat)}</span></span><span class="t">${t.notlar.length} not${t.notlar.some(n => n.uyari) ? ', uyarı var' : ''}</span></div>`).join('') || '<p class="empty">Teslim yeri yok; tek adrese teslim ediliyor.</p>'}</div>
     <div class="grid2e">
       <div class="card"><h2>İhale ve teklifler</h2>${ih.map(i => `<div class="uy"><a href="#ihaleler/${i.id}">${esc(i.ikn)}, ${esc(i.konu)}</a>${ihTag(i)}</div>`).join('') || '<p class="empty">Kayıt yok.</p>'}</div>
       <div class="card"><h2>Sözleşmeler</h2>${sz.map(z => `<div style="padding:6px 0"><a href="#sozlesmeler/${z.id}">${esc(z.no)}</a>${prog(sozOran(z))}</div>`).join('') || '<p class="empty">Kayıt yok.</p>'}</div>
       <div class="card"><h2>Sevkiyatlar ve partiler</h2>${sv.map(v => `<div class="uy"><span><a href="#sevkiyat/${v.id}">${esc(v.no)}</a> <span class="small muted">${v.kalemler.map(l => esc(parti(l.partiId).no)).join(', ')}</span></span>${svTag(v)}</div>`).join('') || '<p class="empty">Kayıt yok.</p>'}</div>
       ${F ? `<div class="card"><h2>Faturalar ve alacak</h2>${ft.map(f => `<div class="uy ${gecikti(f) ? 'al' : ''}"><span>${esc(f.no)} <span class="small muted">${FATURA_TUR[f.tur]}</span><br><span class="small muted">Vade ${trDate(f.vade)}</span></span><b class="num">${kalanF(f) > 0.5 ? money0(kalanF(f)) : '<span class="ok">Ödendi</span>'}</b></div>`).join('') || '<p class="empty">Kayıt yok.</p>'}</div>` : ''}
     </div>`;
+  $('#tyEkle').onclick = () => tyEkleModal(k.id);
+}
+
+
+/* ---- v4: bedel karşılaştırma, iş artışı / eksilişi ---- */
+function bedelKart(z) {
+  if (!F) return '';
+  const deg = z.degisiklik || [], net = degNet(z), gb = guncelBedel(z), ft = sozFatura(z), fark = gb - ft;
+  const pctTop = deg.reduce((t, d) => t + (d.tip === 'artis' ? d.yuzde : -d.yuzde), 0);
+  return `<div class="card" id="bedelKart"><div class="card-h"><h2>Sözleşme bedeli, iş artışı / eksilişi</h2>${z.kapanis ? '' : '<button class="btn sm alt" id="degEkle">İş artışı / eksilişi ekle</button>'}</div>
+    <div class="meta" style="border:0;padding:0;margin:0 0 10px">
+      <div><small>Ana sözleşme bedeli</small><b class="num">${money0(sozTutar(z))}</b></div>
+      <div><small>İş artışı / eksilişi (net)</small><b class="num ${net < 0 ? 'bad' : ''}">${net >= 0 ? '+' : '−'}${money0(Math.abs(net))}</b><div class="small muted">%${nf(pctTop, 1)} (sınır ±%20)</div></div>
+      <div><small>Güncel sözleşme bedeli</small><b class="num" id="gBedel">${money0(gb)}</b></div>
+      <div><small>Kesilen toplam fatura (KDV hariç)</small><b class="num" id="kFatura">${money0(ft)}</b></div>
+      <div><small>Fark (faturalanacak)</small><b class="num ${fark < 0 ? 'bad' : ''}" id="bFark">${money0(fark)}</b></div>
+    </div>
+    ${deg.map(d => `<div class="uy"><span>${trDate(d.tarih)}, ${d.tip === 'artis' ? 'iş artışı' : 'iş eksilişi'} %${nf(d.yuzde, 1)}${d.ack ? ', ' + esc(d.ack) : ''}</span><b class="num ${d.tip === 'artis' ? '' : 'bad'}">${d.tip === 'artis' ? '+' : '−'}${money0(d.tutar)}</b></div>`).join('')}
+    ${(z.ekTeminat || []).map(t => `<div class="uy"><span>İş artışı kesin teminatı, ${esc(t.no)}, ${t.tur === 'nakit' ? 'nakit' : esc(t.banka)}</span><b class="num">${money0(t.tutar)}</b></div>`).join('')}
+  </div>`;
+}
+function degModal(z) {
+  const ana = sozTutar(z), mevcut = (z.degisiklik || []).reduce((t, d) => t + (d.tip === 'artis' ? d.yuzde : -d.yuzde), 0);
+  modal('İş artışı / eksilişi', `<p class="small muted" style="margin-bottom:12px">Ana bedel ${money0(ana)}. Toplam değişiklik ±%20'yi geçemez (şu an %${nf(mevcut, 1)}). İş artışında ek kesin teminat (%6) verilir ve kurum carisine alacak yazılır.</p>
+    <div class="fg"><label class="f"><span>Tür</span><select class="inp" id="dtip"><option value="artis">İş artışı</option><option value="eksilis">İş eksilişi</option></select></label>
+      <label class="f"><span>Yüzde</span><input class="inp" id="dyuz" inputmode="decimal" placeholder="Örn. 20"></label>
+      <label class="f"><span>Tutar (₺, KDV hariç)</span><input class="inp" id="dtut" inputmode="decimal"></label>
+      <label class="f"><span>Tarih</span><input class="inp" type="date" id="dtar" value="${TODAY}"></label></div>
+    <label class="f"><span>Açıklama</span><input class="inp" id="dack" placeholder="Örn. İdare yazısı ile %20 iş artışı"></label>
+    <div id="dtem" class="fg">${z.kesin ? `<label class="f"><span>Ek kesin teminat türü</span><select class="inp" id="dttur"><option value="mektup">Teminat mektubu</option><option value="nakit">Nakit</option></select></label>
+      <label class="f"><span>Ek kesin teminat (₺)</span><input class="inp" id="dtt" inputmode="decimal"></label>
+      <label class="f"><span>Banka</span><input class="inp" id="dtb" value="${esc(z.kesin.banka)}"></label><label class="f"><span>Mektup no</span><input class="inp" id="dtno" value="KTM-2026-0${600 + (z.ekTeminat || []).length + S.sozlesmeler.indexOf(z)}"></label>` : '<p class="small muted">Bu iş türünde teminat yok.</p>'}</div>
+    <p class="small bad hide" id="derr"></p>
+    <div class="foot"><button class="btn alt" data-close>Vazgeç</button><button class="btn" id="dok">Kaydet</button></div>`, m => {
+    const sync = () => { const y = numIn($('#dyuz', m).value) || 0, t = Math.round(ana * y / 100); $('#dtut', m).value = t || ''; if ($('#dtt', m)) $('#dtt', m).value = Math.round(t * 0.06) || ''; $('#dtem', m).classList.toggle('hide', $('#dtip', m).value !== 'artis'); };
+    $('#dyuz', m).oninput = sync; $('#dtip', m).onchange = sync; sync();
+    $('#dok', m).onclick = () => {
+      const tip = $('#dtip', m).value, yuzde = numIn($('#dyuz', m).value), tutar = numIn($('#dtut', m).value), err = t => { $('#derr', m).textContent = t; $('#derr', m).classList.remove('hide'); };
+      if (!(yuzde > 0) || !(tutar > 0)) return err('Yüzde ve tutar girin.');
+      const yeni = mevcut + (tip === 'artis' ? yuzde : -yuzde); if (Math.abs(yeni) > 20.0001) return err(`Toplam değişiklik %${nf(yeni, 1)} olur; sınır ±%20.`);
+      z.degisiklik = z.degisiklik || []; z.degisiklik.push({ tarih: $('#dtar', m).value, tip, yuzde, tutar, ack: $('#dack', m).value.trim() });
+      if (tip === 'artis' && z.kesin && $('#dtt', m) && numIn($('#dtt', m).value) > 0) { z.ekTeminat = z.ekTeminat || []; z.ekTeminat.push({ tur: $('#dttur', m).value, tutar: numIn($('#dtt', m).value), banka: $('#dtb', m).value, no: $('#dtno', m).value, verilis: $('#dtar', m).value, iade: false, iadeTarih: null, talep: null, artis: true }); }
+      save(); m.remove(); toast(tip === 'artis' ? 'İş artışı kaydedildi; ek kesin teminat teminatlara ve kurum carisine eklendi.' : 'İş eksilişi kaydedildi.'); route();
+    };
+  });
+}
+
+/* ---- v4: ihale dosyası kapanışı ---- */
+function sozKapanis(id) {
+  const z = soz(id), ih = ihale(z.ihId), tl = teminatlar().filter(x => x.szId === z.id || x.id === 'g-' + z.ihId), ft = S.faturalar.filter(f => f.szId === z.id);
+  const rows = z.kalemler.map(x => { const tes = teslimEdilen(z, x.uid), red = reddedilen(z, x.uid), fat = faturalanan(z, x.uid); return { x, tes, red, fat, eks: x.mik - tes, ff: tes - fat }; });
+  const uy = [];
+  rows.forEach(r => { if (r.eks > 0) uy.push(`${urun(r.x.uid).ad}: ${nf(r.eks)} adet eksik teslim`); if (r.eks < 0) uy.push(`${urun(r.x.uid).ad}: ${nf(-r.eks)} adet fazla teslim`); if (r.ff > 0) uy.push(`${urun(r.x.uid).ad}: ${nf(r.ff)} adet teslim edildi ama faturalanmadı`); if (r.ff < 0) uy.push(`${urun(r.x.uid).ad}: ${nf(-r.ff)} adet fazla faturalandı`); });
+  tl.filter(x => !x.t.iade).forEach(x => uy.push(`${x.cins === 'gecici' ? 'Geçici' : x.alt ? 'İş artışı' : 'Kesin'} teminat iade alınmadı (${F ? money0(x.t.tutar) : x.t.no || ''})`));
+  ft.filter(f => kalanF(f) > 0.5).forEach(f => uy.push(`${f.no} faturasında tahsil edilmemiş ${F ? money0(kalanF(f)) : 'tutar'} var`));
+  dagHata(z).forEach(x => uy.push(`${urun(x.uid).ad}: teslim yeri dağılımı ana miktarla tutmuyor`));
+  const kp = z.kapanis;
+  view.innerHTML = `<a class="back" href="#sozlesmeler/${z.id}">Sözleşmeye dön</a>
+    <div class="hd"><div><h1>Dosya kapanışı: ${esc(z.no)}</h1><p>${esc(ih.ikn)}, ${kurumAd(z.k)}. Kalem bazında sözleşme, teslim ve fatura mutabakatı.</p></div>${kp ? tag('Dosya kapandı, ' + trDate(kp.tarih), 'g') : ''}</div>
+    <div class="card"><h2>Kalem mutabakatı</h2>${tbl([['Kalem'], ['Sözleşme', 'r'], ['Teslim edilen (kabul)', 'r'], ['Muayenede ret', 'r'], ['Faturalanan', 'r'], ['Durum']],
+      rows.map(r => `<tr class="${r.eks || r.ff ? 'crit' : ''}" data-mut="${r.x.uid}"><td data-l="Kalem">${esc(urun(r.x.uid).ad)}<div class="small muted">${esc(r.x.amb || '')}</div></td><td data-l="Sözleşme" class="r num">${nf(r.x.mik)}</td><td data-l="Teslim" class="r num">${nf(r.tes)}</td>
+        <td data-l="Ret" class="r num ${r.red ? 'bad' : ''}">${nf(r.red)}</td><td data-l="Faturalanan" class="r num">${nf(r.fat)}</td>
+        <td data-l="Durum" class="small">${!r.eks && !r.ff ? tag('Tamam', 'g') : [r.eks > 0 ? `Eksik teslim ${nf(r.eks)}` : r.eks < 0 ? `Fazla teslim ${nf(-r.eks)}` : '', r.ff > 0 ? `Faturalanmamış ${nf(r.ff)}` : r.ff < 0 ? `Fazla fatura ${nf(-r.ff)}` : ''].filter(Boolean).map(t => `<span class="bad">${t}</span>`).join('<br>')}</td></tr>`))}</div>
+    <div class="grid2e" style="margin-top:14px">
+      <div class="card"><h2>Teminat iade durumu</h2>${tl.map(x => `<div class="uy ${x.t.iade ? '' : 'al'}"><span>${x.cins === 'gecici' ? 'Geçici' : x.alt ? 'İş artışı kesin' : 'Kesin'} teminat${F ? ', ' + money0(x.t.tutar) : ''}</span><b>${x.t.iade ? '<span class="ok">İade alındı</span>' : 'Kurumda'}</b></div>`).join('') || '<p class="empty">Teminat yok.</p>'}</div>
+      ${F ? `<div class="card"><h2>Fatura ve tahsilat</h2>${ft.map(f => `<div class="uy ${kalanF(f) > 0.5 ? 'al' : ''}"><span>${esc(f.no)}</span><b class="num">${kalanF(f) > 0.5 ? 'Kalan ' + money0(kalanF(f)) : '<span class="ok">Tahsil edildi</span>'}</b></div>`).join('') || '<p class="empty">Fatura yok.</p>'}
+        <div class="uy"><span>Güncel sözleşme bedeli / kesilen fatura</span><b class="num">${money0(guncelBedel(z))} / ${money0(sozFatura(z))}</b></div></div>` : ''}
+    </div>
+    ${uy.length ? `<div class="note w" id="kapUyari" style="margin-top:14px"><b>${uy.length} uyarı:</b><ul style="margin:4px 0 0 18px">${uy.map(t => `<li>${esc(t)}</li>`).join('')}</ul></div>` : '<div class="note" id="kapUyari" style="margin-top:14px">Mutabakat tamam: tüm kalemler teslim edildi ve faturalandı, teminatlar iade alındı.</div>'}
+    <div class="card" style="margin-top:14px"><h2>Kapanış notu</h2>
+      ${kp ? `<p>${esc(kp.not) || '<span class="muted">Not yok.</span>'}</p><p class="small muted" style="margin-top:6px">${esc(kp.kisi)}, ${trDate(kp.tarih)}${kp.uyari ? ', ' + kp.uyari + ' açık uyarıyla kapatıldı' : ''}</p>`
+      : `<textarea class="inp" id="kapNot" rows="3" placeholder="Örn. Ceyhan'daki 20 bidon ret ikame edilmeyecek, idare ile mutabık kalındı."></textarea>
+        ${uy.length ? '<label class="chk" style="margin-top:8px"><input type="checkbox" id="kapOnay"><span>Uyarıları gördüm, dosyayı yine de kapat</span></label>' : ''}
+        <div class="acts" style="margin-top:10px"><button class="btn acc" id="kapBtn">Dosyayı kapat</button></div>`}</div>`;
+  const b = $('#kapBtn'); if (b) b.onclick = () => { if (uy.length && !$('#kapOnay').checked) return toast('Açık uyarılar var; kapatmak için onay kutusunu işaretleyin.'); z.kapanis = { tarih: TODAY, not: $('#kapNot').value.trim(), kisi: ME.ad, uyari: uy.length }; save(); toast('İhale dosyası kapatıldı.'); route(); };
+}
+
+/* ---- v4: teslim yeri kartı ---- */
+function tyKart(id) {
+  const t = tyBy(id), k = kurum(t.k), svs = S.sevkiyatlar.filter(v => v.tyId === id).sort((a, b) => b.tarih.localeCompare(a.tarih));
+  view.innerHTML = `<a class="back" href="#kurumlar/${k.id}">${esc(k.ad)}</a>
+    <div class="hd"><div><h1>${esc(t.ad)}</h1><p>Teslim yeri kartı. Notlar bir sonraki sevkiyatta ve fatura kesiminde sarı kutuda çıkar.</p></div></div>
+    <div class="grid2e">
+      <div class="card"><h2>Teslim bilgileri</h2>
+        <label class="f"><span>Adres</span><input class="inp" id="tyAdr" value="${esc(t.adres)}"></label>
+        <div class="fg"><label class="f"><span>Depo yetkilisi / sorumlusu</span><input class="inp" id="tyYet" value="${esc(t.yetkili)}"></label><label class="f"><span>Telefon</span><input class="inp" id="tyTel" value="${esc(t.tel)}"></label></div>
+        <label class="f"><span>Mal kabul saatleri</span><input class="inp" id="tySaat" value="${esc(t.saat)}"></label>
+        <div class="fg"><label class="f"><span>Rampa / indirme</span><input class="inp" id="tyRam" value="${esc(t.rampa)}"></label><label class="f"><span>Hamaliye ücreti (₺, yaklaşık)</span><input class="inp" id="tyHam" value="${t.hamaliye || 0}" inputmode="decimal"></label></div>
+        <label class="chk"><input type="checkbox" id="tyFork" ${t.forklift ? 'checked' : ''}><span>Teslim yerinde forklift var</span></label>
+        <button class="btn" id="tyKay" style="margin-top:10px">Kaydet</button></div>
+      <div class="card"><h2>Notlar ve yaşanan sorunlar</h2>
+        <textarea class="inp" id="tyNot" rows="2" placeholder="Örn. Depo sorumlusu teslimden önce aranmalı"></textarea>
+        <div class="acts" style="margin-top:8px"><label class="chk"><input type="checkbox" id="tyUy"><span>Uyarı olarak işaretle</span></label><button class="btn sm" id="tyNotEkle">Not ekle</button></div>
+        ${t.notlar.slice().sort((a, b) => b.tarih.localeCompare(a.tarih)).map(n => `<div class="uy ${n.uyari ? 'al' : ''}"><span>${n.uyari ? '<b>Uyarı.</b> ' : ''}${esc(n.metin)}<br><span class="small muted">${trDate(n.tarih)}, ${esc(n.kim)}, ${n.kaynak === 'fatura' ? 'fatura teslimi' : n.kaynak === 'kart' ? 'kart' : 'sevkiyat'}</span></span></div>`).join('') || '<p class="empty">Not yok.</p>'}</div>
+    </div>
+    <div class="card" style="margin-top:14px"><h2>Bu teslim yerine sevkiyatlar</h2>${svs.map(v => `<div class="uy"><span><a href="#sevkiyat/${v.id}">${esc(v.no)}</a>, ${trDate(v.tarih)}, ${v.kalemler.map(l => nf(l.mik) + ' ' + esc(urun(l.uid).ad)).join(', ')}</span>${svTag(v)}</div>`).join('') || '<p class="empty">Henüz sevkiyat yok.</p>'}</div>`;
+  $('#tyKay').onclick = () => { Object.assign(t, { adres: $('#tyAdr').value, yetkili: $('#tyYet').value, tel: $('#tyTel').value, saat: $('#tySaat').value, rampa: $('#tyRam').value, hamaliye: numIn($('#tyHam').value) || 0, forklift: $('#tyFork').checked }); save(); toast('Teslim yeri kartı kaydedildi.'); };
+  $('#tyNotEkle').onclick = () => { const m = $('#tyNot').value.trim(); if (!m) return toast('Not yazın.'); t.notlar.push({ tarih: TODAY, metin: m, kaynak: 'kart', uyari: $('#tyUy').checked, kim: ME.ad }); save(); toast('Not eklendi; sonraki sevkiyatta görünecek.'); route(); };
+}
+function tyEkleModal(kId) {
+  modal('Teslim yeri ekle', `<label class="f"><span>Teslim yeri adı</span><input class="inp" id="tya" placeholder="Örn. Kozan Devlet Hastanesi"></label><label class="f"><span>Adres</span><input class="inp" id="tyad"></label>
+    <div class="fg"><label class="f"><span>Depo yetkilisi</span><input class="inp" id="tyy"></label><label class="f"><span>Telefon</span><input class="inp" id="tyt"></label></div>
+    <div class="foot"><button class="btn alt" data-close>Vazgeç</button><button class="btn" id="tyok">Ekle</button></div>`, m => {
+    $('#tyok', m).onclick = () => { const ad = $('#tya', m).value.trim(); if (!ad) return toast('Ad girin.'); const t = { id: 'ty' + Date.now(), k: kId, ad, adres: $('#tyad', m).value, yetkili: $('#tyy', m).value, tel: $('#tyt', m).value, saat: 'Hafta içi 09:00–16:00', forklift: false, hamaliye: 0, rampa: '', notlar: [] }; S.teslimYerleri.push(t); save(); m.remove(); location.hash = 'kurumlar/ty-' + t.id; };
+  });
 }
 
 if (ME) shell();

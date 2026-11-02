@@ -53,7 +53,7 @@
     const z = soz(v.szId), k = kurum(v.k), ih = ihale(z.ihId);
     document.title = 'İrsaliye ' + v.irsNo;
     doc.innerHTML = head(v.sir, 'Sevk İrsaliyesi', `İrsaliye no: <b>${esc(v.irsNo)}</b><br>Düzenleme: ${trDate(v.tarih)}<br>Sevk: ${trDate(v.tarih)}`) + `
-      <div class="two"><div><small>Alıcı</small><b>${esc(k.ad)}</b><br>${esc(k.yetkili)}<br>${esc(k.il)}</div>
+      <div class="two"><div><small>Alıcı</small><b>${esc(k.ad)}</b><br>${tyBy(v.tyId) ? 'Teslim yeri: <b>' + esc(tyBy(v.tyId).ad) + '</b><br>' + esc(tyBy(v.tyId).adres) + '<br>Teslim alan: ' + esc(tyBy(v.tyId).yetkili) : esc(k.yetkili) + '<br>' + esc(k.il)}</div>
         <div><small>Dayanak</small>Sözleşme ${esc(z.no)}<br>İKN ${esc(ih.ikn)}<br>${esc(ih.konu)}</div></div>
       <div class="two"><div><small>Taşıyan</small>${v.nakliye.tip === 'kendi' ? 'Çözüm Lojistik Nakliye Ltd. Şti.' : esc(v.nakliye.firma)}<br>${v.nakliye.tip === 'ambar' ? 'Ambar ile gönderim, takip no: <b>' + esc(v.nakliye.takip || '-') + '</b>' : 'Plaka: <b>' + esc(v.nakliye.plaka) + '</b><br>Şoför: ' + esc(v.nakliye.sofor)}</div>
         <div><small>Teslim</small>${v.tutanak ? 'Muayene ve kabul tutanağı ' + esc(v.tutanak.no) + ', ' + trDate(v.tutanak.tarih) : 'Teslim bekleniyor'}</div></div>
@@ -71,13 +71,13 @@
     document.title = 'Teminat iade talebi ' + x.ikn;
     doc.innerHTML = head(x.sir, 'Teminat İade Talebi', `Sayı: CZM-${TODAY.slice(0, 4)}/${String(400 + id.length * 7).padStart(4, '0')}<br>Tarih: ${trDate(TODAY)}`) + `
       <p style="margin-bottom:14px"><b>${esc(k.ad.toLocaleUpperCase('tr-TR'))}</b><br>${esc(k.yetkili)}<br>${esc(k.il)}</p>
-      <p style="margin-bottom:10px"><b>Konu:</b> ${ke ? 'Kesin' : 'Geçici'} teminatın iadesi hakkında.</p>
+      <p style="margin-bottom:10px"><b>Konu:</b> ${x.alt ? 'İş artışına ilişkin ek kesin' : ke ? 'Kesin' : 'Geçici'} teminatın iadesi hakkında.</p>
       <p style="margin-bottom:10px">İdarenizce ${trDate(ih.tarih)} tarihinde yapılan <b>${esc(ih.ikn)}</b> İKN'li "${esc(ih.konu)}" ihalesine ${ke ? 'ilişkin <b>' + esc(x.szNo) + '</b> sayılı sözleşme kapsamındaki tüm teslimatlar tamamlanmış ve muayene kabul işlemleri ' + trDate(x.iadeEd) + ' tarihinde sonuçlanmıştır' : (ih.durum === 'kaybedildi' ? 'teklif vermiş olup ihale ' + trDate(x.iadeEd) + ' tarihinde sonuçlanmıştır' : 'ilişkin sözleşme ' + trDate(x.iadeEd) + ' tarihinde imzalanmıştır')}.</p>
       <p style="margin-bottom:10px">Bu nedenle firmamızca idarenize ${trDate(x.t.verilis)} tarihinde verilen, aşağıda bilgileri yazılı ${ke ? 'kesin' : 'geçici'} teminatın 4734 sayılı Kamu İhale Kanunu${ke ? ' ve 4735 sayılı Kamu İhale Sözleşmeleri Kanunu' : ''} hükümleri uyarınca tarafımıza iadesini saygılarımızla arz ederiz.</p>
       <div class="tw"><table class="t"><tbody>
         <tr><td>İhale kayıt numarası (İKN)</td><td><b>${esc(x.ikn)}</b></td></tr>
         ${ke ? `<tr><td>Sözleşme</td><td>${esc(x.szNo)}</td></tr>` : ''}
-        <tr><td>Teminat türü</td><td>${ke ? 'Kesin' : 'Geçici'} teminat, ${x.t.tur === 'nakit' ? 'nakit' : 'teminat mektubu'}</td></tr>
+        <tr><td>Teminat türü</td><td>${x.alt ? 'İş artışı ek kesin' : ke ? 'Kesin' : 'Geçici'} teminat, ${x.t.tur === 'nakit' ? 'nakit' : 'teminat mektubu'}</td></tr>
         <tr><td>Tutar</td><td><b class="num">${money(x.t.tutar)}</b></td></tr>
         ${x.t.tur === 'nakit' ? '<tr><td>İade hesabı</td><td>Firmamızın kayıtlı banka hesabı</td></tr>' : `<tr><td>Banka</td><td>${esc(x.t.banka)}</td></tr><tr><td>Mektup no</td><td>${esc(x.t.no)}</td></tr>`}
       </tbody></table></div>

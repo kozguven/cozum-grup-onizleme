@@ -1,5 +1,5 @@
 /* Çözüm Grup Yönetim, tıklanabilir demo. Tüm veriler yalnız bu tarayıcıda (localStorage) saklanır. */
-const KEY = 'cozum-grup-demo-v3';
+const KEY = 'cozum-grup-demo-v4';
 const SKEY = 'cozum-grup-oturum';
 const PROTO = 'Bu bir ön prototiptir, hazır paket yazılım değildir. Program, firmanızın iş akışına göre size özel geliştirilir; ekranlar ve alanlar sizinle birlikte netleştirilir.';
 
@@ -50,7 +50,8 @@ const KURUMLAR = [
   { id: 'k5', ad: 'Jandarma Genel Komutanlığı Lojistik Başkanlığı', il: 'Ankara', vkn: '4720•••••', yetkili: 'İkmal Şube, Yzb. Onur Tekin', tel: '0312 456 •• ••', vade: 30, tip: 'kamu' },
   { id: 'k6', ad: 'Konya Selçuklu Belediyesi', il: 'Konya', vkn: '7740•••••', yetkili: 'Destek Hizmetleri Md., Ahmet Uçar', tel: '0332 241 •• ••', vade: 30, tip: 'kamu' },
   { id: 'k7', ad: 'Marmara Otel İşletmeleri A.Ş.', il: 'İstanbul', vkn: '6120•••••', yetkili: 'Satın Alma Md., Deniz Karaca', tel: '0216 455 •• ••', vade: 45, tip: 'firma' },
-  { id: 'k8', ad: 'Kuzey Endüstriyel Tesis Hizmetleri Ltd. Şti.', il: 'Kocaeli', vkn: '5560•••••', yetkili: 'Genel Md., Orhan Bilgin', tel: '0262 751 •• ••', vade: 30, tip: 'firma' }
+  { id: 'k8', ad: 'Kuzey Endüstriyel Tesis Hizmetleri Ltd. Şti.', il: 'Kocaeli', vkn: '5560•••••', yetkili: 'Genel Md., Orhan Bilgin', tel: '0262 751 •• ••', vade: 30, tip: 'firma' },
+  { id: 'k9', ad: 'Adana İl Sağlık Müdürlüğü', il: 'Adana', vkn: '0080•••••', yetkili: 'Destek Hizmetleri Şube Md., Gülay Ersoy', tel: '0322 458 •• ••', vade: 60, tip: 'kamu' }
 ];
 
 const TEDARIKCILER = [
@@ -106,9 +107,23 @@ const URUNLER = [
   { id: 'u5', ad: 'Çamaşır Suyu 4 L', grup: 'Sıvı', spec: 'klor', fiyat: 85, iscilik: 4, recete: [['h9', 1.4], ['h6', 0.03], ['h16', 1], ['h19', 1], ['h18', 0.25]] },
   { id: 'u6', ad: 'Sıvı Arap Sabunu 5 L', grup: 'Sıvı', spec: 'sabun', fiyat: 175, iscilik: 7, recete: [['h8', 0.9], ['h7', 0.22], ['h12', 0.005], ['h14', 1], ['h19', 1], ['h18', 0.25]] },
   { id: 'u7', ad: 'Sıvı El Sabunu 5 L', grup: 'Sıvı', spec: 'el', fiyat: 150, iscilik: 6, recete: [['h2', 0.5], ['h13', 0.15], ['h10', 0.02], ['h11', 0.0005], ['h12', 0.01], ['h14', 1], ['h19', 1], ['h18', 0.25]] },
-  { id: 'u8', ad: 'Endüstriyel Yağ Çözücü 20 L', grup: 'Sıvı', spec: 'yag', fiyat: 780, iscilik: 18, recete: [['h6', 1.2], ['h2', 0.6], ['h1', 0.4], ['h15', 1], ['h19', 1]] }
+  { id: 'u8', ad: 'Endüstriyel Yağ Çözücü 20 L', grup: 'Sıvı', spec: 'yag', fiyat: 780, iscilik: 18, recete: [['h6', 1.2], ['h2', 0.6], ['h1', 0.4], ['h15', 1], ['h19', 1]] },
+  { id: 'u9', ad: 'Sıvı Bulaşık Deterjanı 20 L', grup: 'Sıvı', spec: 'bulasik', fiyat: 610, iscilik: 14, recete: [['h1', 1.8], ['h2', 1], ['h6', 0.24], ['h13', 0.48], ['h10', 0.04], ['h11', 0.002], ['h12', 0.02], ['h15', 1], ['h19', 1]] }
 ];
 
+const AMB = { u1: '10 kg torba', u2: '10 kg torba', u3: '5 L bidon', u4: '5 L bidon', u5: '4 L şişe', u6: '5 L bidon', u7: '5 L bidon', u8: '20 L bidon', u9: '20 L bidon' };
+const SARTNAME = {
+  u1: ['Aktif madde en az %8, fosfat içermez', 'Kütle yoğunluğu 0,45–0,70 g/cm³', '10 kg baskılı PE torba, üretim ve son kullanma tarihi etiketli'],
+  u2: ['Klor içermez, endüstriyel bulaşık makinesine uygun', '10 kg torba, nem geçirmez ambalaj'],
+  u3: ['Aktif madde en az %14, pH 6,5–8,0', 'Viskozite en az 800 cP', '5 L kapaklı HDPE bidon, 4 bidonluk koli'],
+  u4: ['Aktif madde en az %5, pH 7–9', 'Kalıntı bırakmaz, parfümlü', '5 L kapaklı HDPE bidon'],
+  u5: ['Aktif klor en az %4,5', 'pH 11,5–13', '4 L şişe, çocuk emniyetli kapak'],
+  u6: ['Potasyum sabunu, aktif madde en az %18', '5 L bidon'],
+  u7: ['Aktif madde en az %10, pH 5,5–7, cilde uyumlu', 'Dermatolojik test raporu', '5 L bidon'],
+  u8: ['Alkali yağ çözücü, pH 12–13,5', '20 L bidon, tehlike etiketli'],
+  u9: ['Aktif madde en az %14, pH 6,5–8,0', '20 L bidon']
+};
+const kalemTek = (uid, ikn) => ({ amb: AMB[uid], sartname: (SARTNAME[uid] || []).slice(), dosya: 'Teknik_Sartname_' + String(ikn).replace(/\//g, '-') + '.pdf' });
 const EVRAK_T = {
   dogrudan: ['Teklif mektubu', 'Birim fiyat teklif cetveli', 'Ürün analiz raporları', 'Vergi ve SGK borcu yoktur yazısı'],
   piyasa: ['Fiyat teklifi', 'Ürün teknik föyleri', 'Numune gönderildi', 'Ödeme ve teslim şartları']
@@ -134,7 +149,7 @@ function seed() {
     sirketler: SIRKETLER, kurumlar: KURUMLAR.slice(), tedarikciler: TEDARIKCILER.slice(),
     hammaddeler: JSON.parse(JSON.stringify(HAMMADDE)), urunler: JSON.parse(JSON.stringify(URUNLER)),
     hareketler: [], alimlar: [], ihaleler: [], sozlesmeler: [], emirler: [], partiler: [], sevkiyatlar: [], faturalar: [],
-    araclar: [], personel: [], puantaj: {}, isler: [], kullanicilar: [], lotlar: [], bordro: {}, bordroLog: [], bordroCols: BORDRO_COLS.map(c => ({ k: c[0], ad: c[1], tur: c[2] })),
+    araclar: [], personel: [], puantaj: {}, isler: [], kullanicilar: [], lotlar: [], teslimYerleri: [], bordro: {}, bordroLog: [], bordroCols: BORDRO_COLS.map(c => ({ k: c[0], ad: c[1], tur: c[2] })),
     seq: { lot: 0, ihale: 20, soz: 14, sevk: 40, irs: 40, fat: 120, kul: 10, per: 40, is: 60, hrk: 100, alim: 30, arac: 10, ted: 10, kur: 10, urun: 10, hm: 30, ay: {} }
   };
   const bm = uid => birimMaliyet(uid, s);
@@ -195,13 +210,13 @@ function seed() {
     { id: 'ar2', plaka: '41 ÇZM 425', tip: 'Kamyon (10 teker)', kapasite: '14 palet', sofor: 'pr12', kmMaliyet: 24 },
     { id: 'ar3', plaka: '41 ÇZM 433', tip: 'Kamyonet', kapasite: '4 palet', sofor: 'pr13', kmMaliyet: 14 }
   ];
-  const KM = { k1: 340, k2: 115, k3: 15, k4: 340, k5: 345, k6: 560, k7: 120, k8: 20 };
+  const KM = { k1: 340, k2: 115, k3: 15, k4: 340, k5: 345, k6: 560, k7: 120, k8: 20, k9: 470 };
 
   /* ihaleler */
   const IH = (id, sir, k, ikn, konu, g, durum, kal, yakOran, rakip, evrakN, gecBitisG, gecIade, tur) => {
     tur = tur || 'acik';
     const teklif = kal.reduce((t, x) => t + x[1] * x[2], 0);
-    return { id, sir, k, ikn, konu, tarih: dayStr(g), durum, kalemler: kal.map(([uid, mik, fiyat]) => ({ uid, mik, fiyat })),
+    return { id, sir, k, ikn, konu, tarih: dayStr(g), durum, kalemler: kal.map(([uid, mik, fiyat]) => Object.assign({ uid, mik, fiyat }, kalemTek(uid, ikn))), dagilim: {},
       yaklasik: Math.round(teklif * yakOran / 1000) * 1000, rakip, evrak: (EVRAK_T[tur] || EVRAK).map((ad, i) => ({ ad, ok: i < evrakN })), tur,
       gecici: tur !== 'acik' ? null : { tur: 'mektup', tutar: Math.round(teklif * 0.03 / 100) * 100, banka: ['Halkbank Ankara Kurumsal', 'Vakıfbank Gebze Ticari', 'Ziraat Bankası Kocaeli OSB'][id.length % 3], no: 'GTM-2026-' + (1100 + (+id.slice(1)) * 17), verilis: dayStr(g), bitis: dayStr(gecBitisG), iade: gecIade, iadeTarih: gecIade ? dayStr(Math.min(g + 12, -1)) : null, talep: null },
       sonuc: durum === 'kazanildi' || durum === 'kaybedildi' ? dayStr(g + 7) : null,
@@ -220,6 +235,7 @@ function seed() {
     IH('i15', 's1', 'k2', '2026/0981245', 'Sağlık tesisleri çamaşır suyu alımı', -160, 'kazanildi', [['u5', 2000, 80]], 1.1, '', 10, -100, true),
     IH('i16', 's1', 'k5', '2026/1022871', 'Garnizon temizlik malzemesi alımı', -140, 'kazanildi', [['u4', 1000, 135], ['u3', 800, 158]], 1.1, '', 10, -80, true),
     IH('i17', 's1', 'k3', '2026/0899450', 'Belediye temizlik malzemesi (2026/1)', -180, 'kazanildi', [['u5', 2500, 79]], 1.1, '', 10, -120, true),
+    IH('i18', 's1', 'k9', '2026/1489022', 'İlçe hastaneleri temizlik malzemesi alımı', -35, 'kazanildi', [['u3', 2000, 161], ['u5', 3000, 83], ['u7', 1500, 146]], 1.1, 'İkinci: Çukurova Kimya, %2,9 yüksek.', 10, 55, true),
     IH('i10', 's2', 'k4', '2026/1215582', 'Pansiyonlar için çamaşır suyu ve el sabunu', -68, 'kaybedildi', [['u5', 3000, 86], ['u7', 1500, 152]], 1.06, 'Kazanan: Başkent Deterjan, %1,1 düşük.', 10, -38, true),
     IH('i11', 's1', 'k1', 'DT-2026-118', 'Acil el sabunu ve yüzey temizleyici alımı (22/d)', -20, 'kazanildi', [['u7', 400, 152], ['u4', 300, 141]], 1.08, '3 firmadan teklif alındı, en uygun teklif bizim.', 4, 0, true, 'dogrudan'),
     IH('i12', 's1', 'k3', 'DT-2026-131', 'Spor salonları çamaşır suyu alımı (22/d)', -1, 'teklif', [['u5', 800, 86]], 1.06, '', 4, 0, true, 'dogrudan'),
@@ -232,10 +248,26 @@ function seed() {
     const ih = s.ihaleler.find(i => i.id === ihId); ih.sozId = id;
     const tutar = ih.kalemler.reduce((t, x) => t + x.mik * x.fiyat, 0);
     if (ih.gecici && ih.gecici.iade) ih.gecici.iadeTarih = dayStr(g + 5);
-    return { id, no, sir: ih.sir, ihId, k: ih.k, tur: ih.tur, tarih: dayStr(g), kalemler: JSON.parse(JSON.stringify(ih.kalemler)),
+    return { id, no, sir: ih.sir, ihId, k: ih.k, tur: ih.tur, tarih: dayStr(g), kalemler: JSON.parse(JSON.stringify(ih.kalemler)), dagilim: JSON.parse(JSON.stringify(ih.dagilim || {})), degisiklik: [], ekTeminat: [], kapanis: null,
       plan: plan.map(([pg, not]) => ({ tarih: dayStr(pg), not })),
       kesin: ih.tur !== 'acik' ? null : { tur: kesinIade === 'nakit' ? 'nakit' : 'mektup', tutar: Math.round(tutar * 0.06 / 100) * 100, banka: ih.gecici.banka, no: 'KTM-2026-' + (300 + g * -1), verilis: dayStr(g), iade: kesinIade === true, iadeTarih: kesinIade === true ? dayStr(-100) : null, talep: null } };
   };
+  const TY = (id, k, ad, adres, yetkili, tel, saat, forklift, hamaliye, rampa, notlar) => ({ id, k, ad, adres, yetkili, tel, saat, forklift, hamaliye, rampa, notlar: (notlar || []).map(([g, metin, kaynak, uyari]) => ({ tarih: dayStr(g), metin, kaynak, uyari: !!uyari, kim: kaynak === 'fatura' ? 'Ayşe Yıldız' : 'Hasan Çelik' })) });
+  s.teslimYerleri = [
+    TY('ty1', 'k9', 'Ceyhan Devlet Hastanesi', 'Ceyhan / Adana, arka bahçe depo girişi', 'Ali Kaya (ambar memuru)', '0322 613 •• ••', 'Hafta içi 08:30–15:30, öğle 12:00–13:00 mal kabul yok', false, 1200, 'Rampa yok, elle indirme',
+      [[-18, 'Forklift yok; 2 hamal önceden ayarlanmalı. Hamaliye 1.200 TL nakit ödendi.', 'sevkiyat', true], [-17, 'Fatura ambar memuruna değil, satın alma birimine (2. kat) elden teslim edilmeli.', 'fatura', true]]),
+    TY('ty2', 'k9', 'Kozan Devlet Hastanesi', 'Kozan / Adana, B blok bodrum depo', 'Hüseyin Arslan (depo sorumlusu)', '0322 515 •• ••', 'Salı ve perşembe 09:00–14:00', true, 0, 'Rampa var, forklift hastaneye ait',
+      [[-30, 'Tır giremiyor, kamyonet veya 10 tekerli araç gönderilmeli.', 'sevkiyat', true]]),
+    TY('ty3', 'k9', 'Seyhan Devlet Hastanesi', 'Seyhan / Adana, merkez depo', 'Derya Uçar', '0322 441 •• ••', 'Hafta içi 08:00–16:00', true, 800, 'Rampa var', []),
+    TY('ty4', 'k9', 'Yüreğir Devlet Hastanesi', 'Yüreğir / Adana, teknik servis yanı depo', 'Mustafa Demir', '0322 322 •• ••', 'Hafta içi 09:00–15:00', false, 1000, 'Rampa yok', [[-40, 'Depo sorumlusu teslimden 1 gün önce aranmalı, aranmazsa mal kabul yapılmıyor.', 'sevkiyat', true]]),
+    TY('ty5', 'k9', 'Adana Şehir Hastanesi', 'Yüreğir / Adana, lojistik depo 3 numaralı kapı', 'Selin Kara (lojistik birimi)', '0322 455 •• ••', 'Hafta içi 07:30–15:00, randevulu', true, 0, 'Yükleme rampası ve forklift var', []),
+    TY('ty6', 'k1', 'Ankara Şehir Hastanesi Merkez Depo', 'Çankaya / Ankara, Bilkent kampüsü lojistik depo', 'Murat Şen (depo şefi)', '0312 552 •• ••', 'Hafta içi 08:00–14:00, araç randevusu zorunlu', true, 3500, 'Rampa var, hamaliye depo taşeronuna ödenir',
+      [[-34, 'Araç randevusu bir gün önce 14:00\'e kadar alınmalı; randevusuz araç 3 saat bekletildi.', 'sevkiyat', true], [-9, 'Hamaliye 3.500 TL, forklift 1.500 TL makbuzla ödendi.', 'sevkiyat', false]]),
+    TY('ty7', 'k4', 'MEB Ankara Okul Malzeme Deposu', 'Yenimahalle / Ankara', 'Kenan Yurt', '0312 397 •• ••', 'Hafta içi 09:00–16:00', true, 2000, 'Rampa var', []),
+    TY('ty8', 'k3', 'Kocaeli BB Merkez Ambarı', 'İzmit / Kocaeli', 'Sevgi Aydın', '0262 318 •• ••', 'Hafta içi 08:30–16:30', true, 0, 'Rampa var', [])
+  ];
+  const ad = s.ihaleler.find(i => i.id === 'i18');
+  ad.dagilim = { ty1: { u3: 400, u5: 600, u7: 300 }, ty2: { u3: 300, u5: 500, u7: 200 }, ty3: { u3: 500, u5: 700, u7: 400 }, ty4: { u3: 300, u5: 500, u7: 200 }, ty5: { u3: 500, u5: 700, u7: 400 } };
   s.sozlesmeler = [
     SZ('sz1', 'i1', 'SZ-2026-009', -45, [[-35, '1. teslim, %25'], [-10, '2. teslim, %25'], [20, '3. teslim, %25'], [50, '4. teslim, %25']], false),
     SZ('sz2', 'i2', 'SZ-2026-011', -28, [[6, '1. teslim, %50'], [40, '2. teslim, %50']], false),
@@ -245,6 +277,7 @@ function seed() {
     SZ('sz8', 'i15', 'SZ-2026-001', -150, [[-130, 'Tek teslim']], false),
     SZ('sz9', 'i16', 'SZ-2026-002', -128, [[-100, 'Tek teslim']], 'nakit'),
     SZ('sz10', 'i17', 'SZ-2026-004', -170, [[-140, 'Tek teslim']], true),
+    SZ('sz11', 'i18', 'SZ-2026-013', -24, [[-10, '1. teslim, ilçe hastaneleri'], [20, '2. teslim'], [50, '3. teslim']], false),
     SZ('sz6', 'i11', 'DT-2026-018', -18, [[-8, 'Tek teslim']], false),
     SZ('sz7', 'i13', 'SP-2026-007', -22, [[-14, '1. sevk'], [16, '2. sevk']], false)
   ];
@@ -268,19 +301,19 @@ function seed() {
   };
 
   /* sevkiyat */
-  const SV = (szId, g, durum, lines, nk, tutanakG) => {
+  const SV = (szId, g, durum, lines, nk, tutanakG, tyId) => {
     const sz = s.sozlesmeler.find(x => x.id === szId);
     const n = Object.assign({ hamaliye: 0, forklift: 0, km: 0, firma: '', takip: '', plaka: '', sofor: '' }, nk);
     if (n.tip === 'kendi') { const a = s.araclar.find(x => x.id === n.aracId); n.plaka = a.plaka; n.sofor = s.personel.find(p => p.id === a.sofor).ad; n.km = KM[sz.k] * 2; n.tasima = n.km * a.kmMaliyet; }
     n.bedel = n.tasima + n.hamaliye + n.forklift;
-    const sv = { id: 'sv' + (s.sevkiyatlar.length + 1), no: 'SV-2026-0' + (++s.seq.sevk), irsNo: 'CZI2026000000' + (++s.seq.irs), sir: sz.sir, szId, k: sz.k, tarih: dayStr(g), durum,
+    const sv = { id: 'sv' + (s.sevkiyatlar.length + 1), no: 'SV-2026-0' + (++s.seq.sevk), irsNo: 'CZI2026000000' + (++s.seq.irs), sir: sz.sir, szId, k: sz.k, tyId: tyId || ((s.teslimYerleri.find(t => t.k === sz.k) || {}).id || null), tarih: dayStr(g), durum,
       kalemler: lines, nakliye: n,
       tutanak: tutanakG != null ? { no: 'MKT-' + (2026) + '/' + (140 + s.sevkiyatlar.length * 3), tarih: dayStr(tutanakG) } : null, faturaId: null };
     s.sevkiyatlar.push(sv); return sv;
   };
-  const histSevk = (szId, g, items, nk) => {
-    const lines = items.map(([uid, mik]) => ({ partiId: mkParti(uid, mik, szId, g - 4, 'onay', s.sozlesmeler.find(x => x.id === szId).sir).id, uid, mik }));
-    return SV(szId, g, 'teslim', lines, nk, g + 1);
+  const histSevk = (szId, g, items, nk, tyId) => {
+    const lines = items.map(([uid, mik, red, redNot]) => ({ partiId: mkParti(uid, mik, szId, g - 4, 'onay', s.sozlesmeler.find(x => x.id === szId).sir).id, uid, mik, red: red || 0, redNot: redNot || '' }));
+    return SV(szId, g, 'teslim', lines, nk, g + 1, tyId);
   };
   const sv5 = histSevk('sz5', -70, [['u4', 1500], ['u2', 400]], { tip: 'ambar', firma: 'Konya Ambarı Nakliyat', takip: 'KA-55120', tasima: 9800, hamaliye: 2400 });
   const sv1 = histSevk('sz3', -40, [['u5', 3000], ['u8', 150]], { tip: 'kendi', aracId: 'ar2' });
@@ -292,9 +325,11 @@ function seed() {
   const sv9 = histSevk('sz8', -130, [['u5', 2000]], { tip: 'kendi', aracId: 'ar2' });
   const sv10 = histSevk('sz9', -100, [['u4', 1000], ['u3', 800]], { tip: 'ambar', firma: 'Başkent Ambarı', takip: 'BA-71120', tasima: 11800, hamaliye: 2500, forklift: 1200 });
   const sv11 = histSevk('sz10', -140, [['u5', 2500]], { tip: 'kendi', aracId: 'ar3' });
+  const sv12 = histSevk('sz11', -10, [['u3', 400, 20, 'Etiket hasarlı, 20 bidon iade'], ['u5', 600]], { tip: 'kendi', aracId: 'ar2', hamaliye: 1200 }, 'ty1');
   const sv8 = histSevk('sz7', -14, [['u3', 200], ['u5', 300], ['u1', 75]], { tip: 'piyasa', firma: 'Kartal Lojistik (kiralık kamyon)', plaka: '34 TRK 905', sofor: 'Ahmet Kurt', tasima: 7500 });
 
   const pA = mkParti('u3', 1200, 'sz1', -3, 'onay');
+  mkParti('u5', 1500, 'sz11', -2, 'onay'); mkParti('u7', 900, 'sz11', -3, 'onay'); mkParti('u3', 800, 'sz11', -4, 'onay');
   const pB = mkParti('u1', 500, 'sz2', -4, 'onay');
   mkParti('u4', 800, 'sz1', -5, 'onay');
   mkParti('u7', 1000, 'sz4', -1, 'kalite');
@@ -325,6 +360,7 @@ function seed() {
   FT(sv10, -99, [[-65, 'tam', 'Havale']]);
   FT(sv11, -139, [[-105, 'tam', 'Belediye ödeme emri']]);
   FT(sv8, -13, [[-3, 'tam', 'Havale']]);
+  FT(sv12, -9, []);
   const kc1 = mkKomisyon(s, { sir: 's1', k: 'k4', konu: 'Okul temizlik ekipmanı (mop, kova, temizlik arabası) temini', tedAd: 'Ege Temizlik Ekipmanları Ltd.', bedel: 100000, komisyon: 10000, tarih: dayStr(-40) });
   kc1.tahsilat.push({ tarih: dayStr(-10), tutar: 100000, ack: 'Bakanlık ödemesi' }); kc1.aktarim.push({ tarih: dayStr(-8), tutar: 90000 });
   mkKomisyon(s, { sir: 's1', k: 'k1', konu: 'Kağıt havlu ve tuvalet kâğıdı temini', tedAd: 'Kartal Kağıt San. A.Ş.', bedel: 240000, komisyon: 18000, tarih: dayStr(-12) });
@@ -366,7 +402,7 @@ function nextNo(s, pre, tarih) {
 }
 function mkFatura(s, sv, tarih) {
   const sz = s.sozlesmeler.find(x => x.id === sv.szId), k = s.kurumlar.find(x => x.id === sv.k);
-  const matrah = sv.kalemler.reduce((t, l) => t + l.mik * sz.kalemler.find(x => x.uid === l.uid).fiyat, 0);
+  const matrah = sv.kalemler.reduce((t, l) => t + (l.mik - (l.red || 0)) * sz.kalemler.find(x => x.uid === l.uid).fiyat, 0);
   const f = { id: 'f' + (++s.seq.fat), no: 'CZF2026000000' + s.seq.fat, tur: { acik: 'ihale', dogrudan: 'dogrudan', piyasa: 'piyasa' }[sz.tur || 'acik'], sir: sv.sir, svId: sv.id, szId: sv.szId, k: sv.k, tarih, vade: addDays(tarih, k.vade), matrah, kdv: matrah * 0.2, toplam: matrah * 1.2, tahsilat: [] };
   sv.faturaId = f.id; s.faturalar.push(f); return f;
 }
@@ -427,7 +463,18 @@ const arac = id => S.araclar.find(x => x.id === id);
 /* hesaplar */
 const ihaleTutar = i => i.kalemler.reduce((t, x) => t + x.mik * x.fiyat, 0);
 const sozTutar = z => z.kalemler.reduce((t, x) => t + x.mik * x.fiyat, 0);
-function teslimEdilen(z, uid) { return S.sevkiyatlar.filter(v => v.szId === z.id && v.durum === 'teslim').reduce((t, v) => t + v.kalemler.filter(l => l.uid === uid).reduce((a, l) => a + l.mik, 0), 0); }
+const kabulMik = l => l.mik - (l.red || 0);
+function teslimEdilen(z, uid, tyId) { return S.sevkiyatlar.filter(v => v.szId === z.id && v.durum === 'teslim' && (!tyId || v.tyId === tyId)).reduce((t, v) => t + v.kalemler.filter(l => l.uid === uid).reduce((a, l) => a + kabulMik(l), 0), 0); }
+function reddedilen(z, uid) { return S.sevkiyatlar.filter(v => v.szId === z.id && v.durum === 'teslim').reduce((t, v) => t + v.kalemler.filter(l => l.uid === uid).reduce((a, l) => a + (l.red || 0), 0), 0); }
+function yoldaTy(z, uid, tyId) { return S.sevkiyatlar.filter(v => v.szId === z.id && v.durum !== 'teslim' && v.tyId === tyId).reduce((t, v) => t + v.kalemler.filter(l => l.uid === uid).reduce((a, l) => a + l.mik, 0), 0); }
+const dagVar = r => r.dagilim && Object.keys(r.dagilim).length > 0;
+const dagToplam = (r, uid) => Object.values(r.dagilim || {}).reduce((t, d) => t + (d[uid] || 0), 0);
+const dagHata = r => dagVar(r) ? r.kalemler.filter(x => dagToplam(r, x.uid) !== x.mik) : [];
+function faturalanan(z, uid) { return S.faturalar.filter(f => f.szId === z.id && f.svId).reduce((t, f) => { const v = sevk(f.svId); return t + v.kalemler.filter(l => l.uid === uid).reduce((a, l) => a + kabulMik(l), 0); }, 0); }
+const degNet = z => (z.degisiklik || []).reduce((t, d) => t + (d.tip === 'artis' ? d.tutar : -d.tutar), 0);
+const guncelBedel = z => sozTutar(z) + degNet(z);
+const sozFatura = z => S.faturalar.filter(f => f.szId === z.id).reduce((t, f) => t + f.matrah, 0);
+const tyBy = id => S.teslimYerleri.find(t => t.id === id);
 function yoldaMik(z, uid) { return S.sevkiyatlar.filter(v => v.szId === z.id && v.durum !== 'teslim').reduce((t, v) => t + v.kalemler.filter(l => l.uid === uid).reduce((a, l) => a + l.mik, 0), 0); }
 function sozOran(z) { const top = z.kalemler.reduce((t, x) => t + x.mik, 0); const tes = z.kalemler.reduce((t, x) => t + Math.min(x.mik, teslimEdilen(z, x.uid)), 0); return top ? tes / top : 0; }
 const sozBitti = z => sozOran(z) >= 0.9999;
@@ -444,7 +491,8 @@ function teminatlar() {
   const L = [];
   S.ihaleler.forEach(i => { if (i.gecici && i.durum !== 'hazirlaniyor') L.push({ id: 'g-' + i.id, cins: 'gecici', ikn: i.ikn, k: i.k, sir: i.sir, t: i.gecici, ihId: i.id,
     iadeEd: i.durum === 'kaybedildi' ? (i.sonuc || i.tarih) : i.durum === 'kazanildi' && i.sozId && soz(i.sozId) ? soz(i.sozId).tarih : null }); });
-  S.sozlesmeler.forEach(z => { if (z.kesin) L.push({ id: 'k-' + z.id, cins: 'kesin', ikn: ihale(z.ihId).ikn, szNo: z.no, k: z.k, sir: z.sir, t: z.kesin, ihId: z.ihId, szId: z.id, iadeEd: kabulTarih(z) }); });
+  S.sozlesmeler.forEach(z => { if (z.kesin) L.push({ id: 'k-' + z.id, cins: 'kesin', ikn: ihale(z.ihId).ikn, szNo: z.no, k: z.k, sir: z.sir, t: z.kesin, ihId: z.ihId, szId: z.id, iadeEd: kabulTarih(z) });
+    (z.ekTeminat || []).forEach((t, n) => L.push({ id: 'e-' + z.id + '-' + n, cins: 'kesin', alt: 'artis', ikn: ihale(z.ihId).ikn, szNo: z.no, k: z.k, sir: z.sir, t, ihId: z.ihId, szId: z.id, iadeEd: kabulTarih(z) })); });
   L.forEach(x => { x.bekleme = x.iadeEd && !x.t.iade ? Math.max(0, diffDays(TODAY, x.iadeEd)) : 0; x.unutuldu = !x.t.iade && !!x.iadeEd && x.bekleme >= 30; });
   return L;
 }
@@ -473,7 +521,7 @@ function netOdeme(p, ay) {
   const kes = S.bordroCols.filter(c => c.tur === 'kesinti').reduce((t, c) => t + (b[c.k] || 0), 0);
   return { o, b, maasPay, fm, arti, kes, net: maasPay + arti - kes };
 }
-const svCiro = v => { const z = soz(v.szId); return v.kalemler.reduce((t, l) => t + l.mik * z.kalemler.find(x => x.uid === l.uid).fiyat, 0); };
+const svCiro = v => { const z = soz(v.szId); return v.kalemler.reduce((t, l) => t + kabulMik(l) * z.kalemler.find(x => x.uid === l.uid).fiyat, 0); };
 
 /* şirket süzgeci */
 const inSir = x => aktifSir() === 'hepsi' || x.sir === aktifSir();
