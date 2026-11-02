@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Belge, Çözüm Grup Yönetim demo</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="doc-wrap">
+  <div class="doc-tools">
+    <a class="btn alt" id="geri" href="panel.html">Panele dön</a>
+    <button type="button" class="btn" id="yazdir">Yazdır / PDF kaydet</button>
+  </div>
+  <div class="doc" id="doc"></div>
+</div>
+<div class="foot" id="foot"></div>
+<script src="store.js"></script>
+<script>
+(function () {
+  $('#foot').textContent = 'Demo belge, örnek verilerle oluşturulmuştur. ' + PROTO + ' Hazırlayan: Webizmo';
+  $('#yazdir').onclick = () => window.print();
+  const qs = new URLSearchParams(location.search), tip = qs.get('tip'), id = qs.get('id'), doc = $('#doc'), u = me();
+  if (document.referrer && document.referrer.indexOf('panel.html') > -1) $('#geri').onclick = e => { e.preventDefault(); history.back(); };
+  const fail = t => { doc.innerHTML = `<p>${t} <a href="panel.html">Panele dön</a></p>`; };
+  if (!u) return fail('Belgeyi görmek için önce demo girişi yapın.');
+  const head = (sir, baslik, sag) => `<div class="dh"><div><div style="display:flex;align-items:center;gap:10px"><div class="mark">Ç</div><b style="font-family:'IBM Plex Sans Condensed';font-size:18px">${esc(sirket(sir).ad)}</b></div>
+    <p class="small muted" style="margin-top:6px">Çözüm Şirketler Grubu<br>Gebze OSB, 41400 Gebze / Kocaeli, 0262 000 00 00<br>VKN 000•••••••, Gebze Vergi Dairesi</p></div>
+    <div><h1>${baslik}</h1><p class="small" style="text-align:right">${sag}</p></div></div>`;
+  const mrow = (a, b) => `<div class="sumrow"><span>${a}</span><span class="num">${b}</span></div>`;
+
+  if (tip === 'analiz') {
+    const p = parti(id); if (!p) return fail('Parti bulunamadı.');
+    if (p.durum !== 'onay') return fail('Bu parti kalite onayı almadığı için analiz raporu düzenlenemez.');
+    const pr = urun(p.uid), sp = SPEC[pr.spec], svs = S.sevkiyatlar.filter(v => v.kalemler.some(l => l.partiId === p.id));
+    document.title = 'Analiz raporu ' + p.no;
+    doc.innerHTML = head(p.sir, 'Analiz Raporu', `Rapor no: <b>AR-${p.no.slice(2)}</b><br>Tarih: ${trDate(p.kkTarih)}`) + `
+      <div class="two"><div><small>Ürün</small><b>${esc(pr.ad)}</b><br>Grup: ${pr.grup}</div>
+        <div><small>Parti</small><b>${esc(p.no)}</b><br>Üretim: ${trDate(p.tarih)}, son kullanma: ${trDate(p.skt)}<br>Parti miktarı: ${nf(p.mik)} adet</div></div>
+      <div class="tw"><table class="t"><thead><tr><th>Parametre</th><th>Yöntem</th><th class="r">Kabul aralığı</th><th class="r">Sonuç</th><th>Değerlendirme</th></tr></thead><tbody>
+        ${sp.map(x => `<tr><td>${esc(x.ad)}</td><td class="small">${{ ph: 'pH metre, 25 °C', yog: 'Piknometre', aktif: 'Titrasyon', visk: 'Brookfield, 25 °C', nem: 'Etüv, 105 °C' }[x.k]}</td><td class="r num">${nf(x.min)} – ${nf(x.max)} ${x.bir}</td><td class="r num"><b>${nf(p.olcum[x.k])} ${x.bir}</b></td><td>Uygun</td></tr>`).join('')}
+        <tr><td>Görünüm, renk, koku</td><td class="small">Gözle, standart numuneyle</td><td class="r">Standart</td><td class="r">${esc(p.olcum.gorunum)}</td><td>Uygun</td></tr>
+      </tbody></table></div>
+      <p style="margin-top:14px"><b>Sonuç:</b> Parti, ürün spesifikasyonuna ve sözleşme teknik şartnamesine uygundur.</p>
+      ${svs.length ? `<p class="small muted" style="margin-top:6px">Sevk edildiği kurumlar: ${[...new Set(svs.map(v => kurum(v.k).ad))].map(esc).join(', ')}</p>` : ''}
+      <div class="sign"><div>Analizi yapan<br><b style="color:var(--ink)">${esc(p.kkKisi)}</b>, Kalite Kontrol</div><div>Onaylayan<br><b style="color:var(--ink)">Kalite Müdürü</b></div></div>
+      <p class="dnote">Demo belgedir. Gerçek sistemde rapor, laboratuvar cihazlarından veya formdan girilen değerlerle otomatik oluşur ve ihale dosyasına eklenebilir.</p>`;
+    return;
+  }
+  if (tip === 'irsaliye') {
+    const v = sevk(id); if (!v) return fail('Sevkiyat bulunamadı.');
+    const z = soz(v.szId), k = kurum(v.k), ih = ihale(z.ihId);
+    document.title = 'İrsaliye ' + v.irsNo;
+    doc.innerHTML = head(v.sir, 'Sevk İrsaliyesi', `İrsaliye no: <b>${esc(v.irsNo)}</b><br>Düzenleme: ${trDate(v.tarih)}<br>Sevk: ${trDate(v.tarih)}`) + `
+      <div class="two"><div><small>Alıcı</small><b>${esc(k.ad)}</b><br>${esc(k.yetkili)}<br>${esc(k.il)}</div>
+        <div><small>Dayanak</small>Sözleşme ${esc(z.no)}<br>İKN ${esc(ih.ikn)}<br>${esc(ih.konu)}</div></div>
+      <div class="two"><div><small>Taşıyan</small>${v.nakliye.tip === 'kendi' ? 'Çözüm Lojistik Nakliye Ltd. Şti.' : esc(v.nakliye.firma)}<br>Plaka: <b>${esc(v.nakliye.plaka)}</b><br>Şoför: ${esc(v.nakliye.sofor)}</div>
+        <div><small>Teslim</small>${v.tutanak ? 'Muayene ve kabul tutanağı ' + esc(v.tutanak.no) + ', ' + trDate(v.tutanak.tarih) : 'Teslim bekleniyor'}</div></div>
+      <div class="tw"><table class="t"><thead><tr><th>Sıra</th><th>Ürün</th><th>Parti no</th><th>SKT</th><th class="r">Miktar</th></tr></thead><tbody>
+        ${v.kalemler.map((l, n) => { const p = parti(l.partiId); return `<tr><td>${n + 1}</td><td>${esc(urun(l.uid).ad)}</td><td>${esc(p.no)}</td><td>${trDate(p.skt)}</td><td class="r num">${nf(l.mik)} adet</td></tr>`; }).join('')}
+      </tbody></table></div>
+      <div class="sign"><div>Teslim eden<br><b style="color:var(--ink)">${esc(v.nakliye.sofor)}</b></div><div>Teslim alan (kurum)<br>Ad soyad, imza, mühür</div></div>
+      <p class="dnote">Demo belgedir. Gerçek sistemde e-İrsaliye olarak GİB'e iletilir; parti numaraları üzerinden geri izleme yapılır.</p>`;
+    return;
+  }
+  if (!u.fiyat) return fail('Bu belge tutar içerdiği için yetkiniz yok.');
+  if (tip === 'fatura') {
+    const f = fatura(id); if (!f) return fail('Fatura bulunamadı.');
+    const v = sevk(f.svId), z = soz(f.szId), k = kurum(f.k);
+    document.title = 'Fatura ' + f.no;
+    doc.innerHTML = head(f.sir, 'e-Fatura', `Fatura no: <b>${esc(f.no)}</b><br>Tarih: ${trDate(f.tarih)}<br>Vade: ${trDate(f.vade)}`) + `
+      <div class="two"><div><small>Sayın</small><b>${esc(k.ad)}</b><br>${esc(k.il)}<br>VKN ${esc(k.vkn)}</div>
+        <div><small>Dayanak</small>Sözleşme ${esc(z.no)}, İKN ${esc(ihale(z.ihId).ikn)}<br>İrsaliye ${esc(v.irsNo)}<br>Kabul tutanağı ${v.tutanak ? esc(v.tutanak.no) : '-'}</div></div>
+      <div class="tw"><table class="t"><thead><tr><th>Ürün</th><th class="r">Miktar</th><th class="r">Birim fiyat</th><th class="r">KDV</th><th class="r">Tutar</th></tr></thead><tbody>
+        ${v.kalemler.map(l => { const fy = z.kalemler.find(x => x.uid === l.uid).fiyat; return `<tr><td>${esc(urun(l.uid).ad)}<div class="small muted">Parti ${esc(parti(l.partiId).no)}</div></td><td class="r num">${nf(l.mik)} adet</td><td class="r num">${money(fy)}</td><td class="r">%20</td><td class="r num">${money(fy * l.mik)}</td></tr>`; }).join('')}
+      </tbody></table></div>
+      <div class="totals">${mrow('Matrah', money(f.matrah))}${mrow('KDV %20', money(f.kdv))}<div class="sumrow tot"><span>Ödenecek tutar</span><span class="num">${money(f.toplam)}</span></div>
+        ${f.tahsilat.length ? mrow('Tahsil edilen', money(tahsil(f))) + mrow('Kalan', money(kalanF(f))) : ''}</div>
+      <p class="dnote">Demo belgedir. Gerçek sistemde e-Fatura özel entegratör üzerinden GİB'e ve kuruma iletilir. Fiyatlar örnektir.</p>`;
+    return;
+  }
+  if (tip === 'ekstre') {
+    const k = kurum(id); if (!k) return fail('Kurum bulunamadı.');
+    const sir = aktifSir(), fs = S.faturalar.filter(f => f.k === k.id && (sir === 'hepsi' || f.sir === sir));
+    const hr = [];
+    fs.forEach(f => { hr.push({ t: f.tarih, a: 'Fatura ' + f.no + ', vade ' + trDate(f.vade), b: f.toplam, c: 0 }); f.tahsilat.forEach(x => hr.push({ t: x.tarih, a: 'Tahsilat, ' + x.ack, b: 0, c: x.tutar })); });
+    hr.sort((a, b) => a.t.localeCompare(b.t)); let bak = 0;
+    document.title = 'Ekstre ' + k.ad;
+    doc.innerHTML = head(sir === 'hepsi' ? 's1' : sir, 'Cari Hesap Ekstresi', `Tarih: ${trDate(TODAY)}${sir === 'hepsi' ? '<br>Tüm grup şirketleri' : ''}`) + `
+      <div class="two"><div><small>Cari</small><b>${esc(k.ad)}</b><br>${esc(k.il)}, ödeme vadesi ${k.vade} gün</div><div></div></div>
+      <div class="tw"><table class="t"><thead><tr><th>Tarih</th><th>Açıklama</th><th class="r">Borç</th><th class="r">Alacak</th><th class="r">Bakiye</th></tr></thead><tbody>
+        ${hr.map(h => { bak += h.b - h.c; return `<tr><td>${trDate(h.t)}</td><td>${esc(h.a)}</td><td class="r num">${h.b ? money(h.b) : ''}</td><td class="r num">${h.c ? money(h.c) : ''}</td><td class="r num">${money(bak)}</td></tr>`; }).join('') || '<tr><td colspan="5">Hareket yok.</td></tr>'}
+      </tbody></table></div>
+      <div class="totals"><div class="sumrow tot"><span>Güncel bakiye</span><span class="num">${money(bak)}</span></div>
+        ${mrow('Vadesi geçen', money(fs.filter(gecikti).reduce((t, f) => t + kalanF(f), 0)))}</div>
+      <p class="dnote">Demo belgedir.</p>`;
+    return;
+  }
+  fail('Belge türü bulunamadı.');
+})();
+</script>
+</body>
+</html>

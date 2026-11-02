@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Çözüm Grup Yönetim, demo</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="mtop">
+  <div class="mark">Ç</div>
+  <select id="msel" aria-label="Bölüm seçin"></select>
+</div>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><div class="mark">Ç</div><div><b>Çözüm Grup Yönetim</b><small>Çözüm Şirketler Grubu</small></div></div>
+    <nav id="nav" aria-label="Bölümler"></nav>
+    <div class="sfoot">Demo, Webizmo tarafından hazırlanmıştır<br><button type="button" class="linkbtn small" id="reset2">Demo verisini sıfırla</button></div>
+  </aside>
+  <div>
+    <div class="topbar">
+      <div class="sirsel"><label for="sir">Şirket</label><select class="inp" id="sir"></select></div>
+      <div class="who"><div><b id="wname"></b><small id="wrole"></small></div><a class="btn alt sm" href="index.html" id="cikis">Kullanıcı değiştir</a></div>
+    </div>
+    <main class="main" id="view"></main>
+    <div class="proto"><b>Ön prototip.</b> <span id="protoTxt"></span> Demo, Webizmo tarafından hazırlanmıştır.</div>
+  </div>
+</div>
+<script src="store.js"></script>
+<script src="app.js"></script>
+<script src="app2.js"></script>
+</body>
+</html>

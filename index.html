@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Çözüm Grup Yönetim, demo girişi</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="login">
+  <div>
+    <div class="top"><div class="mark">Ç</div><div><b>Çözüm Grup Yönetim</b><span class="small muted">Çözüm Şirketler Grubu, ihale, üretim, sevkiyat ve tahsilat programı</span></div></div>
+    <h1>Taner Bey, programı buradan deneyebilirsiniz</h1>
+    <p class="lead">İhaleden tahsilata tek program: ihale kazanılır, sözleşme açılır, üretim emri verilir, parti kalite kontrolden geçer, sevk edilir, faturası kesilir ve tahsilatı izlenir. Her adım bir sonrakine bağlıdır.</p>
+    <div class="protobox" id="proto"></div>
+    <ol>
+      <li>Bu demo örnek verilerle çalışır; yaptığınız değişiklikler bu tarayıcıda saklanır.</li>
+      <li>Farklı kullanıcılarla girip her personelin yalnız kendi bölümünü gördüğünü deneyebilirsiniz. Üretim, kalite ve sevkiyat personeli fiyat ve tahsilat tutarlarını görmez.</li>
+      <li>Yönetici olarak "Kullanıcılar ve yetkiler" ekranından yeni personel ekleyip şifresini ve yetkilerini siz belirleyebilirsiniz.</li>
+    </ol>
+    <p class="small muted">Fabrika, ofis ve telefondan aynı sisteme erişilir; ekranlar telefona göre uyarlanır.</p>
+  </div>
+  <div class="card">
+    <h2 style="margin-bottom:4px">Demo girişi</h2>
+    <p class="small muted" style="margin-bottom:12px">Kullanıcı seçin. Demo şifresi: 1234 (sonradan eklediğiniz personelde kendi belirlediğiniz şifre).</p>
+    <form id="lf">
+      <div class="ulist" id="ul" role="radiogroup" aria-label="Kullanıcı"></div>
+      <label class="f"><span>Kullanıcı adı</span><input class="inp" id="kadi" autocomplete="username" readonly></label>
+      <label class="f"><span>Şifre</span><input class="inp" id="sifre" type="password" autocomplete="current-password"></label>
+      <button class="btn block" type="submit" id="girisBtn">Giriş yap</button>
+      <p class="small bad hide" id="err" style="margin-top:8px"></p>
+    </form>
+    <div style="display:flex;justify-content:space-between;margin-top:14px;gap:10px;flex-wrap:wrap">
+      <button class="linkbtn small" type="button" id="reset">Demo verisini sıfırla</button>
+      <span class="small muted">Demo, Webizmo tarafından hazırlanmıştır</span>
+    </div>
+  </div>
+</div>
+<div class="foot" id="foot"></div>
+<script src="store.js"></script>
+<script>
+(function () {
+  $('#proto').textContent = PROTO;
+  $('#foot').textContent = PROTO + ' Demo, Webizmo tarafından hazırlanmıştır.';
+  let sel = null;
+  function draw() {
+    const list = S.kullanicilar.filter(u => u.aktif);
+    if (!sel || !list.find(u => u.id === sel)) sel = list[0].id;
+    $('#ul').innerHTML = list.map(u => `<label class="urow ${u.id === sel ? 'on' : ''}"><input type="radio" name="u" value="${u.id}" ${u.id === sel ? 'checked' : ''}>
+      <span><b>${esc(u.ad)}, ${esc(ROLES[u.rol].ad)}</b><small>${esc(ROLE_NOTE[u.rol])}</small></span></label>`).join('');
+    const u = S.kullanicilar.find(x => x.id === sel);
+    $('#kadi').value = u.kadi; $('#sifre').value = u.sifre;
+    $$('#ul input').forEach(i => i.onchange = () => { sel = i.value; $('#err').classList.add('hide'); draw(); });
+  }
+  draw();
+  $('#lf').onsubmit = e => {
+    e.preventDefault();
+    const u = S.kullanicilar.find(x => x.id === sel);
+    if ($('#sifre').value !== u.sifre) { $('#err').textContent = 'Şifre hatalı. Bu kullanıcının demo şifresi alanda hazır geliyor.'; $('#err').classList.remove('hide'); return; }
+    u.son = TODAY; save();
+    setOturum({ uid: u.id, sir: u.sirketler[0] });
+    location.href = 'panel.html';
+  };
+  $('#reset').onclick = () => { resetDemo(); sel = null; draw(); toast('Demo verisi ilk haline döndürüldü.'); };
+})();
+</script>
+</body>
+</html>
