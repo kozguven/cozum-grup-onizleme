@@ -59,12 +59,29 @@ function emirDetay(id) {
 }
 
 /* ============ KALİTE ============ */
+const lot = id => S.lotlar.find(x => x.id === id);
+const lotTag = l => tag(LOT_DURUM[l.durum], { karantina: 'a', kabul: 'g', red: 'r' }[l.durum]);
 ROUTES.kalite = function (id) {
+  if (id && id.startsWith('lot-') && lot(id.slice(4))) return lotForm(id.slice(4));
   if (id && parti(id)) return kaliteForm(id);
+  const hmTab = !!(id && id.startsWith('hm'));
+  const top = `<div class="hd"><div><h1>Kalite kontrol</h1><p>İki kol: üretilen partilerin kontrolü ve satın alınan hammaddenin giriş kontrolü. Onaylanmayan parti sevk edilemez, onaylanmayan hammadde stoğa girmez.</p></div></div>
+    <div class="seg" id="kolSeg"><button data-kol="kalite" class="${hmTab ? '' : 'on'}">Üretim kalite kontrol (${S.partiler.filter(p => p.durum === 'kalite' && inSir(p)).length} bekliyor)</button><button data-kol="hm" class="${hmTab ? 'on' : ''}">Hammadde giriş kontrolü (${S.lotlar.filter(l => l.durum === 'karantina' && inSir(l)).length} karantinada)</button></div>`;
+  const bindKol = () => $$('[data-kol]').forEach(b => b.onclick = () => { location.hash = b.dataset.kol === 'hm' ? 'kalite/hm' : 'kalite'; });
+  if (hmTab) {
+    const tab = ['hmkabul', 'hmred'].includes(id) ? id : 'hm', dmap = { hm: 'karantina', hmkabul: 'kabul', hmred: 'red' };
+    const all = S.lotlar.filter(inSir), list = all.filter(l => l.durum === dmap[tab]).sort((a, b) => b.tarih.localeCompare(a.tarih));
+    view.innerHTML = top + tabsHtml([['hm', `Karantinada (${all.filter(l => l.durum === 'karantina').length})`], ['hmkabul', 'Kabul edilen lotlar'], ['hmred', 'Reddedilen']], tab) +
+      `<div class="note">Satın alma ile gelen her hammadde ve ambalaj lotu önce karantinaya alınır. Kalite onayı verilene kadar stokta kullanılabilir görünmez ve üretimde düşülemez.</div>
+      <div class="card">${tbl([['Lot'], ['Malzeme'], ['Miktar', 'r'], ['Tedarikçi'], ['Geliş'], ['Durum'], ['']], list.map(l => { const h = hm(l.hid); return `<tr class="click" data-go="kalite/lot-${l.id}"><td data-l="Lot"><b>${esc(l.no)}</b><div class="small muted">${esc(l.belge)}</div></td><td data-l="Malzeme">${esc(h.ad)}</td>
+        <td data-l="Miktar" class="r num">${nf(l.mik)} ${h.birim}</td><td data-l="Tedarikçi" class="small">${esc(ted(l.tedId).ad)}</td><td data-l="Geliş">${trDate(l.tarih)}</td><td data-l="Durum">${lotTag(l)}</td>
+        <td class="r">${l.durum === 'karantina' ? `<a class="btn sm" href="#kalite/lot-${l.id}">Kontrol et</a>` : ''}</td></tr>`; }), tab === 'hm' ? 'Karantinada bekleyen lot yok.' : 'Kayıt yok.')}</div>`;
+    bindTabs('kalite'); bindKol(); bindClicks(); return;
+  }
   const tab = ['onay', 'red'].includes(id) ? id : 'kalite';
   const all = S.partiler.filter(inSir), list = all.filter(p => p.durum === tab).sort((a, b) => b.tarih.localeCompare(a.tarih));
-  view.innerHTML = `<div class="hd"><div><h1>Kalite kontrol</h1><p>Her parti ölçülür; onaylanmayan parti sevkiyatta seçilemez. Onaylı partinin analiz raporu yazdırılır.</p></div></div>
-    ${tabsHtml([['kalite', `Bekleyen (${all.filter(p => p.durum === 'kalite').length})`], ['onay', 'Onaylı partiler'], ['red', 'Reddedilen']], tab)}
+  view.innerHTML = top + `
+    ${tabsHtml([['kalite', `Bekleyen partiler (${all.filter(p => p.durum === 'kalite').length})`], ['onay', 'Onaylı partiler'], ['red', 'Reddedilen']], tab)}
     <div class="card">${tab === 'kalite' ? tbl([['Parti'], ['Ürün'], ['Miktar', 'r'], ['Üretim tarihi'], ['']],
       list.map(p => `<tr class="click" data-go="kalite/${p.id}"><td data-l="Parti"><b>${esc(p.no)}</b>${sirCol(p)}</td><td data-l="Ürün">${esc(urun(p.uid).ad)}</td><td data-l="Miktar" class="r num">${nf(p.mik)}</td><td data-l="Üretim">${trDate(p.tarih)}</td><td class="r"><a class="btn sm" href="#kalite/${p.id}">Ölçüm gir</a></td></tr>`), 'Kalite bekleyen parti yok.')
     : tab === 'onay' ? tbl([['Parti'], ['Ürün'], ['Üretilen', 'r'], ['Depoda kalan', 'r'], ['Gittiği kurumlar'], ['']],
@@ -73,12 +90,49 @@ ROUTES.kalite = function (id) {
         <td data-l="Gittiği yer" class="small">${[...new Set(svs.map(v => kurum(v.k).ad))].map(esc).join(', ') || '<span class="muted">Depoda</span>'}</td>
         <td class="r"><a class="linkbtn" href="belge.html?tip=analiz&id=${p.id}">Analiz raporu</a></td></tr>`; }))
     : tbl([['Parti'], ['Ürün'], ['Miktar', 'r'], ['Neden']], list.map(p => `<tr class="click" data-go="kalite/${p.id}"><td data-l="Parti"><b>${esc(p.no)}</b></td><td data-l="Ürün">${esc(urun(p.uid).ad)}</td><td data-l="Miktar" class="r num">${nf(p.mik)}</td><td data-l="Neden" class="small">${esc(p.kkNot)}</td></tr>`))}</div>`;
-  bindTabs('kalite'); bindClicks();
+  bindTabs('kalite'); bindKol(); bindClicks();
 };
+function lotSpec(h) { return h.tur === 'hammadde' ? [{ k: 'saf', ad: h.id === 'h9' ? 'Aktif klor' : 'Aktif madde / saflık', bir: '%', min: h.saf[0], max: h.saf[1] }, { k: 'nem', ad: 'Nem', bir: '%', min: 0, max: h.nem }] : []; }
+function lotSel(h) { return h.tur === 'hammadde' ? [['gorunum', 'Görünüm ve ambalaj bütünlüğü']] : [['olcu', 'Ölçü / hacim'], ['sizdirmazlik', 'Sızdırmazlık testi'], ['baski', 'Baskı ve renk']]; }
+function lotForm(id) {
+  const l = lot(id), h = hm(l.hid), sp = lotSpec(h), sel = lotSel(h), ed = l.durum === 'karantina';
+  const out = (x, v) => v !== '' && v != null && !isNaN(v) && (v < x.min || v > x.max);
+  view.innerHTML = `<a class="back" href="#kalite/${{ karantina: 'hm', kabul: 'hmkabul', red: 'hmred' }[l.durum]}">Hammadde giriş kontrolüne dön</a>
+    <div class="hd"><div><h1>Lot ${esc(l.no)}, ${esc(h.ad)}</h1><p>${lotTag(l)} &nbsp; ${nf(l.mik)} ${h.birim}, ${esc(ted(l.tedId).ad)}, geliş ${trDate(l.tarih)}, ${esc(l.belge)}</p></div></div>
+    <div class="card" style="max-width:820px"><h2>${ed ? 'Giriş kontrol formu' : 'Kontrol sonuçları'}</h2>
+    ${tbl([['Kontrol'], ['Kabul kriteri'], ['Sonuç']], sp.map(x => `<tr><td data-l="Kontrol">${esc(x.ad)}</td><td data-l="Kriter" class="num">${x.k === 'nem' ? 'En çok ' + nf(x.max) + ' ' + x.bir : nf(x.min) + ' – ' + nf(x.max) + ' ' + x.bir}</td>
+      <td data-l="Sonuç">${ed ? `<input class="inp sm" data-lk="${x.k}" inputmode="decimal" style="width:110px" aria-label="${esc(x.ad)}">` : `<b class="${out(x, l.olcum[x.k]) ? 'bad' : ''}">${nf(l.olcum[x.k])} ${x.bir}</b>`}</td></tr>`)
+      .concat(sel.map(([k, ad]) => `<tr><td data-l="Kontrol">${ad}</td><td data-l="Kriter">Uygun</td><td data-l="Sonuç">${ed ? `<select class="inp sm" data-ls="${k}" aria-label="${ad}"><option>Uygun</option><option>Uygun değil</option></select>` : esc(l.olcum[k])}</td></tr>`))
+      .concat(h.tur === 'hammadde' ? [`<tr><td data-l="Kontrol">Tedarikçi analiz sertifikası (CoA)</td><td data-l="Kriter">Lotla birlikte gelmeli</td><td data-l="Sonuç">${ed ? '<label class="chk"><input type="checkbox" id="coa" checked><span>Geldi</span></label>' : (l.olcum.coa ? 'Geldi' : 'Gelmedi')}</td></tr>`] : []))}
+    ${ed ? `<label class="f" style="margin-top:12px"><span>Not</span><textarea class="inp" id="lnot" rows="2" placeholder="Ret nedeni veya gözlem"></textarea></label>
+      <p class="small" id="lmsg" style="margin-bottom:10px"></p>
+      <div class="acts"><button class="btn" id="lOnay" disabled>Kabul et, stoğa al</button><button class="btn danger" id="lRed">Reddet, tedarikçiye iade</button></div>`
+    : `<p class="small muted" style="margin-top:10px">${l.durum === 'kabul' ? 'Kabul eden' : 'Reddeden'}: ${esc(l.kkKisi)}, ${trDate(l.kkTarih)}${l.kkNot ? '. Not: ' + esc(l.kkNot) : ''}</p>`}
+    </div>`;
+  if (!ed) return;
+  const vals = () => { const o = {}; sp.forEach(x => { o[x.k] = numIn($(`[data-lk="${x.k}"]`).value); }); sel.forEach(([k]) => { o[k] = $(`[data-ls="${k}"]`).value; }); if ($('#coa')) o.coa = $('#coa').checked; return o; };
+  const check = () => {
+    const v = vals(); let bos = 0, dis = 0;
+    sp.forEach(x => { const i = $(`[data-lk="${x.k}"]`), o = out(x, v[x.k]); i.classList.toggle('out', o); if (isNaN(v[x.k])) bos++; if (o) dis++; });
+    sel.forEach(([k]) => { if (v[k] !== 'Uygun') dis++; }); if ($('#coa') && !v.coa) dis++;
+    $('#lOnay').disabled = bos > 0 || dis > 0;
+    $('#lmsg').innerHTML = dis ? `<span class="bad">${dis} kontrol kriter dışında; lot kabul edilemez.</span>` : bos ? '<span class="muted">Tüm ölçümleri girin.</span>' : '<span class="ok">Tüm kontroller uygun.</span>';
+  };
+  $$('[data-lk]').forEach(i => i.oninput = check); $$('[data-ls]').forEach(i => i.onchange = check); if ($('#coa')) $('#coa').onchange = check; check();
+  const bitir = d => { l.olcum = vals(); l.durum = d; l.kkKisi = ME.ad; l.kkTarih = TODAY; l.kkNot = $('#lnot').value.trim(); };
+  $('#lOnay').onclick = () => { bitir('kabul'); lotKabul(l); save(); toast(`Lot ${l.no} kabul edildi; ${nf(l.mik)} ${h.birim} stokta kullanılabilir.`); route(); };
+  $('#lRed').onclick = () => { if (!$('#lnot').value.trim()) return toast('Ret nedenini not alanına yazın.'); bitir('red'); save(); toast('Lot reddedildi; stoğa girmedi, tedarikçiye iade edilecek.'); route(); };
+}
+function lotKabul(l) {
+  const h = hm(l.hid), t = ted(l.tedId);
+  h.stok = +(h.stok + l.mik).toFixed(3); h.fiyat = l.fiyat;
+  S.hareketler.push({ id: 'hr' + (++S.seq.hrk), tarih: TODAY, hid: h.id, mik: l.mik, tip: 'Satın alma (kalite onaylı)', ack: t.ad + ', lot ' + l.no });
+  S.alimlar.push({ id: 'al' + (++S.seq.alim), sir: l.sir, tedId: t.id, hid: h.id, mik: l.mik, fiyat: l.fiyat, tarih: TODAY, vade: addDays(TODAY, t.vade), tutar: Math.round(l.mik * l.fiyat * 1.2), belge: l.belge, odeme: [] });
+}
 function kaliteForm(id) {
   const p = parti(id), u = urun(p.uid), sp = SPEC[u.spec], ed = p.durum === 'kalite';
   const out = (x, v) => v !== '' && v != null && !isNaN(v) && (v < x.min || v > x.max);
-  view.innerHTML = `<a class="back" href="#kalite${p.durum === 'kalite' ? '' : '/' + p.durum}">Kalite kontrole dön</a>
+  view.innerHTML = `<a class="back" href="#kalite${p.durum === 'kalite' ? '' : '/' + p.durum}">Üretim kalite kontrole dön</a>
     <div class="hd"><div><h1>Parti ${esc(p.no)}, ${esc(u.ad)}</h1><p>${paTag(p)} &nbsp; ${nf(p.mik)} adet, üretim ${trDate(p.tarih)}, emir ${esc(emir(p.emirId) ? emir(p.emirId).no : '')}</p></div>
       ${p.durum === 'onay' ? `<a class="btn alt" href="belge.html?tip=analiz&id=${p.id}">Analiz raporu</a>` : ''}</div>
     <div class="card" style="max-width:820px"><h2>${ed ? 'Ölçüm formu' : 'Ölçüm sonuçları'}</h2>
@@ -113,10 +167,10 @@ ROUTES.sevkiyat = function (id) {
   const list = S.sevkiyatlar.filter(inSir).sort((a, b) => (a.durum === 'teslim') - (b.durum === 'teslim') || b.tarih.localeCompare(a.tarih));
   view.innerHTML = `<div class="hd"><div><h1>Sevkiyat ve nakliye</h1><p>Onaylı partilerden sevk, irsaliye, araç veya nakliyeci, teslim ve muayene kabul tutanağı.</p></div><a class="btn" href="#sevkiyat/yeni">Yeni sevkiyat</a></div>
     ${tabsHtml([['liste', 'Sevkiyatlar'], ['araclar', 'Araçlar']], 'liste')}${sirNote()}
-    <div class="card">${tbl([['Sevkiyat'], ['Kurum'], ['Tarih'], ['Araç / nakliye'], ['Partiler'], ...(F ? [['Nakliye maliyeti', 'r']] : []), ['Durum']],
+    <div class="card">${tbl([['Sevkiyat'], ['Kurum / müşteri'], ['Tarih'], ['Nakliye'], ['Partiler'], ...(F ? [['Nakliye (oran)', 'r']] : []), ['Durum']],
       list.map(v => `<tr class="click" data-go="sevkiyat/${v.id}"><td data-l="Sevkiyat"><b>${esc(v.no)}</b><div class="small muted">${esc(soz(v.szId).no)}</div></td><td data-l="Kurum">${kurumAd(v.k)}${sirCol(v)}</td>
-        <td data-l="Tarih" class="nowrap">${trDate(v.tarih)}</td><td data-l="Araç" class="small">${esc(v.nakliye.plaka)}<div class="muted">${v.nakliye.tip === 'kendi' ? 'Kendi aracımız' : esc(v.nakliye.firma)}</div></td>
-        <td data-l="Partiler" class="small">${v.kalemler.map(l => esc(parti(l.partiId).no)).join(', ')}</td>${F ? `<td data-l="Nakliye" class="r num">${money0(v.nakliye.bedel)}</td>` : ''}<td data-l="Durum">${svTag(v)}</td></tr>`))}</div>`;
+        <td data-l="Tarih" class="nowrap">${trDate(v.tarih)}</td><td data-l="Nakliye" class="small">${esc(v.nakliye.plaka || v.nakliye.takip || '')}<div class="muted">${esc(nakTipAd(v.nakliye))}</div></td>
+        <td data-l="Partiler" class="small">${v.kalemler.map(l => esc(parti(l.partiId).no)).join(', ')}</td>${F ? `<td data-l="Nakliye" class="r num">${money0(v.nakliye.bedel)}<div class="small ${nakOran(v) > 0.1 ? 'bad' : 'muted'}">${pct(nakOran(v))}</div></td>` : ''}<td data-l="Durum">${svTag(v)}</td></tr>`))}</div>`;
   $$('[data-tab]').forEach(b => b.onclick = () => { location.hash = b.dataset.tab === 'araclar' ? 'sevkiyat/araclar' : 'sevkiyat'; });
   bindClicks();
 };
@@ -133,29 +187,44 @@ function sevkYeni(szId) {
   }).join('');
   view.innerHTML = `<a class="back" href="#sevkiyat">Sevkiyata dön</a><div class="hd"><div><h1>Yeni sevkiyat</h1><p>Yalnız kalite onaylı partiler seçilebilir. Hangi partinin hangi kuruma gittiği kayda geçer.</p></div></div>
     <div class="card" style="max-width:860px">
-      <div class="fg"><label class="f"><span>Sözleşme</span><select class="inp" id="ssz">${aktif.map(a => `<option value="${a.id}" ${a.id === z.id ? 'selected' : ''}>${esc(a.no)}, ${esc(kurum(a.k).ad)}</option>`).join('')}</select></label>
+      <div class="fg"><label class="f"><span>Sözleşme / sipariş</span><select class="inp" id="ssz">${aktif.map(a => `<option value="${a.id}" ${a.id === z.id ? 'selected' : ''}>${esc(a.no)}, ${esc(kurum(a.k).ad)}</option>`).join('')}</select></label>
       <label class="f"><span>Sevk tarihi</span><input class="inp" type="date" id="star" value="${dayStr(1)}"></label></div>
       <h3 style="margin-top:6px">Partiler</h3>${rows}
       <h3 style="margin-top:16px;margin-bottom:8px">Nakliye</h3>
-      <div class="seg" id="ntip"><button type="button" data-n="kendi" class="on">Kendi aracımız</button><button type="button" data-n="nakliyeci">Nakliyeci</button></div>
-      <div id="nk" class="fg">
+      <div class="seg" id="ntip">${Object.entries(NAK_TUR).map(([k, ad], i) => `<button type="button" data-n="${k}" class="${i ? '' : 'on'}">${ad}</button>`).join('')}</div>
+      <div data-nk="kendi" class="fg">
         <label class="f"><span>Araç</span><select class="inp" id="sarac">${S.araclar.map(a => `<option value="${a.id}">${esc(a.plaka)}, ${esc(a.tip)}, ${esc(per(a.sofor) ? per(a.sofor).ad : '')}</option>`).join('')}</select></label>
-        <label class="f"><span>Gidiş-dönüş km</span><input class="inp" id="skm" value="${({ k1: 680, k2: 230, k3: 30, k4: 680, k5: 690, k6: 1120 })[z.k] || 300}" inputmode="numeric"></label>
+        <label class="f"><span>Gidiş-dönüş km</span><input class="inp" id="skm" value="${(KM_TAH[z.k] || 300)}" inputmode="numeric"></label>
       </div>
-      <div id="nn" class="fg hide">
-        <label class="f"><span>Nakliye firması</span><input class="inp" id="sfirma" value="Anadolu Ekspres Nakliyat"></label>
-        <label class="f"><span>Plaka</span><input class="inp" id="splaka" placeholder="06 ABC 123"></label>
-        <label class="f"><span>Şoför</span><input class="inp" id="ssofor"></label>
-        ${F ? '<label class="f"><span>Nakliye bedeli (₺)</span><input class="inp" id="sbedel" inputmode="decimal" placeholder="Örn. 14000"></label>' : ''}
+      <div data-nk="piyasa" class="fg hide">
+        <label class="f"><span>Araç sahibi / firma</span><input class="inp" id="spf" placeholder="Örn. Selim Yıldız (kiralık tır)"></label>
+        <label class="f"><span>Plaka</span><input class="inp" id="spp" placeholder="34 ABC 123"></label>
+        <label class="f"><span>Şoför</span><input class="inp" id="sps"></label>
+        <label class="f"><span>Kira / taşıma ücreti (₺)</span><input class="inp" id="spu" inputmode="decimal" placeholder="Örn. 18000"></label>
       </div>
-      ${F ? '<p class="small muted" id="nmal" style="margin-bottom:12px"></p>' : ''}
+      <div data-nk="ambar" class="fg hide">
+        <label class="f"><span>Ambar firması</span><input class="inp" id="saf" value="Başkent Ambarı"></label>
+        <label class="f"><span>Ambar takip / irsaliye no</span><input class="inp" id="sat" placeholder="BA-00000"></label>
+        <label class="f"><span>Ambar ücreti (₺)</span><input class="inp" id="sau" inputmode="decimal" placeholder="Örn. 6500"></label>
+      </div>
+      <div class="fg">
+        <label class="f"><span>Hamaliye (kurumda ödenen, ₺)</span><input class="inp" id="sham" inputmode="decimal" value="0"></label>
+        <label class="f"><span>Forklift bedeli (kurumda ödenen, ₺)</span><input class="inp" id="sfork" inputmode="decimal" value="0"></label>
+      </div>
+      ${F ? '<p class="small" id="nmal" style="margin-bottom:12px"></p>' : ''}
       <p class="small bad hide" id="serr" style="margin-bottom:8px"></p>
       <div class="acts"><button class="btn" id="sok">Sevkiyatı oluştur</button><a class="btn alt" href="#sevkiyat">Vazgeç</a></div>
     </div>`;
   let ntip = 'kendi';
-  const hesap = () => { if (!F) return; const a = arac($('#sarac').value), km = num($('#skm').value) || 0; $('#nmal').textContent = ntip === 'kendi' ? `Tahmini nakliye maliyeti: ${nf(km)} km × ${money(a.kmMaliyet)} = ${money0(km * a.kmMaliyet)} (yakıt, otoyol, şoför). Sözleşme kârlılığına yansır.` : 'Nakliyeci bedeli sözleşme kârlılığına yansır.'; };
-  $$('#ntip button').forEach(b => b.onclick = () => { ntip = b.dataset.n; $$('#ntip button').forEach(x => x.classList.toggle('on', x === b)); $('#nk').classList.toggle('hide', ntip !== 'kendi'); $('#nn').classList.toggle('hide', ntip === 'kendi'); hesap(); });
-  $('#sarac').onchange = hesap; $('#skm').oninput = hesap; hesap();
+  const tasima = () => ntip === 'kendi' ? (num($('#skm').value) || 0) * arac($('#sarac').value).kmMaliyet : numIn(ntip === 'piyasa' ? $('#spu').value : $('#sau').value) || 0;
+  const malBedeli = () => $$('[data-pid]').reduce((t, i) => t + (num(i.value) || 0) * z.kalemler.find(x => x.uid === i.dataset.u).fiyat, 0);
+  const hesap = () => {
+    if (!F) return; const ta = tasima(), ha = numIn($('#sham').value) || 0, fo = numIn($('#sfork').value) || 0, top = ta + ha + fo, mb = malBedeli();
+    $('#nmal').innerHTML = `Toplam nakliye maliyeti: <b>${money0(top)}</b> (taşıma ${money0(ta)}${ntip === 'kendi' ? ', km × ' + money(arac($('#sarac').value).kmMaliyet) : ''} + hamaliye ${money0(ha)} + forklift ${money0(fo)}). ` +
+      (mb ? `Ana fatura tutarı (KDV hariç) ${money0(mb)}, nakliye oranı <b id="nOran">${pct(top / mb)}</b>.` : 'Oran için sevk adedi girin.');
+  };
+  $$('#ntip button').forEach(b => b.onclick = () => { ntip = b.dataset.n; $$('#ntip button').forEach(x => x.classList.toggle('on', x === b)); $$('[data-nk]').forEach(d => d.classList.toggle('hide', d.dataset.nk !== ntip)); hesap(); });
+  $$('#skm,#sarac,#spu,#sau,#sham,#sfork,[data-pid]').forEach(i => { i.oninput = hesap; i.onchange = hesap; }); hesap();
   $('#ssz').onchange = e => { location.hash = 'sevkiyat/yeni-' + e.target.value; };
   $('#sok').onclick = () => {
     const err = t => { $('#serr').textContent = t; $('#serr').classList.remove('hide'); };
@@ -163,25 +232,32 @@ function sevkYeni(szId) {
     if (!lines.length) return err('En az bir partiden sevk adedi girin.');
     const fazla = lines.find(l => l.mik > l.max); if (fazla) return err(parti(fazla.partiId).no + ' partisinde depoda ' + nf(fazla.max) + ' adet var.');
     for (const x of z.kalemler) { const top = lines.filter(l => l.uid === x.uid).reduce((t, l) => t + l.mik, 0), kal = x.mik - teslimEdilen(z, x.uid) - yoldaMik(z, x.uid); if (top > kal) return err(urun(x.uid).ad + ' için sözleşmede kalan ' + nf(kal) + ' adet.'); }
-    let nak;
-    if (ntip === 'kendi') { const a = arac($('#sarac').value), km = num($('#skm').value) || 0; nak = { tip: 'kendi', aracId: a.id, plaka: a.plaka, sofor: per(a.sofor) ? per(a.sofor).ad : '', km, bedel: km * a.kmMaliyet }; }
-    else { if (!$('#splaka').value.trim()) return err('Nakliyeci aracının plakasını girin.'); nak = { tip: 'nakliyeci', firma: $('#sfirma').value, plaka: $('#splaka').value.trim().toUpperCase(), sofor: $('#ssofor').value, km: 0, bedel: F ? (num($('#sbedel').value) || 0) : 0 }; }
-    const v = { id: 'sv' + Date.now(), no: 'SV-2026-0' + (++S.seq.sevk), irsNo: 'CZI2026000000' + (++S.seq.irs), sir: z.sir, szId: z.id, k: z.k, tarih: $('#star').value, durum: 'hazirlaniyor', kalemler: lines.map(l => ({ partiId: l.partiId, uid: l.uid, mik: l.mik })), nakliye: nak, tutanak: null, faturaId: null };
+    let n;
+    if (ntip === 'kendi') { const a = arac($('#sarac').value), km = num($('#skm').value) || 0; n = { tip: 'kendi', aracId: a.id, plaka: a.plaka, sofor: per(a.sofor) ? per(a.sofor).ad : '', firma: '', km }; }
+    else if (ntip === 'piyasa') { if (!$('#spp').value.trim() || !$('#spf').value.trim()) return err('Piyasa aracının sahibini ve plakasını girin.'); n = { tip: 'piyasa', firma: $('#spf').value.trim(), plaka: $('#spp').value.trim().toUpperCase(), sofor: $('#sps').value.trim(), km: 0 }; }
+    else { if (!$('#saf').value.trim()) return err('Ambar firmasını girin.'); n = { tip: 'ambar', firma: $('#saf').value.trim(), takip: $('#sat').value.trim(), plaka: '', sofor: '', km: 0 }; }
+    n.tasima = tasima(); n.hamaliye = numIn($('#sham').value) || 0; n.forklift = numIn($('#sfork').value) || 0; n.bedel = n.tasima + n.hamaliye + n.forklift;
+    const v = { id: 'sv' + Date.now(), no: 'SV-2026-0' + (++S.seq.sevk), irsNo: 'CZI2026000000' + (++S.seq.irs), sir: z.sir, szId: z.id, k: z.k, tarih: $('#star').value, durum: 'hazirlaniyor', kalemler: lines.map(l => ({ partiId: l.partiId, uid: l.uid, mik: l.mik })), nakliye: n, tutanak: null, faturaId: null };
     S.sevkiyatlar.push(v); save(); toast('Sevkiyat ' + v.no + ' oluşturuldu, irsaliye hazır.'); location.hash = 'sevkiyat/' + v.id;
   };
 }
+const KM_TAH = { k1: 680, k2: 230, k3: 30, k4: 680, k5: 690, k6: 1120, k7: 240, k8: 40 };
 function sevkDetay(id) {
-  const v = sevk(id), z = soz(v.szId), f = v.faturaId ? fatura(v.faturaId) : null;
+  const v = sevk(id), z = soz(v.szId), f = v.faturaId ? fatura(v.faturaId) : null, n = v.nakliye;
   const acts = { hazirlaniyor: '<button class="btn" id="aYol">Yola çıktı</button>', yolda: '<button class="btn acc" id="aTes">Teslim edildi</button>', teslim: '' }[v.durum];
   view.innerHTML = `<a class="back" href="#sevkiyat">Sevkiyata dön</a>
     <div class="hd"><div><h1>${esc(v.no)}, ${kurumAd(v.k)}</h1><p>${svTag(v)} &nbsp; Sevk tarihi ${trDate(v.tarih)}, irsaliye ${esc(v.irsNo)}</p></div>
       <div class="acts">${acts}<a class="btn alt" href="belge.html?tip=irsaliye&id=${v.id}">İrsaliye</a></div></div>
-    <div class="meta"><div><small>Sözleşme</small><b>${can('sozlesmeler') ? `<a href="#sozlesmeler/${z.id}">${esc(z.no)}</a>` : esc(z.no)}</b></div>
-      <div><small>Araç</small><b>${esc(v.nakliye.plaka)}</b><div class="small muted">${v.nakliye.tip === 'kendi' ? 'Kendi aracımız' : esc(v.nakliye.firma)}, ${esc(v.nakliye.sofor)}</div></div>
-      ${F ? `<div><small>Nakliye maliyeti</small><b class="num">${money0(v.nakliye.bedel)}</b>${v.nakliye.km ? `<div class="small muted">${nf(v.nakliye.km)} km</div>` : ''}</div>` : ''}
+    <div class="meta"><div><small>Sözleşme / sipariş</small><b>${can('sozlesmeler') ? `<a href="#sozlesmeler/${z.id}">${esc(z.no)}</a>` : esc(z.no)}</b><div class="small muted">${esc(turAd(z.tur))}</div></div>
+      <div><small>Nakliye</small><b>${esc(NAK_TUR[n.tip] || n.tip)}</b><div class="small muted">${n.tip === 'ambar' ? esc(n.firma) + (n.takip ? ', takip ' + esc(n.takip) : '') : esc(n.plaka) + (n.firma ? ', ' + esc(n.firma) : '') + (n.sofor ? ', ' + esc(n.sofor) : '')}</div></div>
       <div><small>Muayene ve kabul tutanağı</small><b>${v.tutanak ? esc(v.tutanak.no) + ', ' + trDate(v.tutanak.tarih) : 'Teslimde girilir'}</b></div>
       ${F && can('fatura') ? `<div><small>Fatura</small><b>${f ? `<a href="belge.html?tip=fatura&id=${f.id}">${esc(f.no)}</a>` : v.durum === 'teslim' ? '<a href="#fatura/kesilecek">Kesilecek</a>' : 'Teslimden sonra'}</b></div>` : ''}
     </div>
+    ${F ? `<div class="card" style="margin-bottom:14px"><h2>Nakliye maliyeti</h2><div class="meta" style="border:0;padding:0;margin:0">
+      <div><small>Taşıma${n.tip === 'kendi' && n.km ? ' (' + nf(n.km) + ' km)' : ''}</small><b class="num">${money0(n.tasima)}</b></div><div><small>Hamaliye</small><b class="num">${money0(n.hamaliye)}</b></div>
+      <div><small>Forklift</small><b class="num">${money0(n.forklift)}</b></div><div><small>Toplam nakliye</small><b class="num">${money0(n.bedel)}</b></div>
+      <div><small>Ana fatura tutarı (KDV hariç)</small><b class="num">${money0(svCiro(v))}</b></div><div><small>Nakliye / fatura</small><b class="num ${nakOran(v) > 0.1 ? 'bad' : ''}" id="svOran">${pct(nakOran(v))}</b></div>
+    </div></div>` : ''}
     <div class="card"><h2>Sevk edilen partiler</h2>${tbl([['Ürün'], ['Parti'], ['Üretim'], ['Miktar', 'r']], v.kalemler.map(l => { const p = parti(l.partiId); return `<tr><td data-l="Ürün">${esc(urun(l.uid).ad)}</td><td data-l="Parti">${can('kalite') ? `<a href="#kalite/${p.id}">${esc(p.no)}</a>` : esc(p.no)}</td><td data-l="Üretim">${trDate(p.tarih)}</td><td data-l="Miktar" class="r num">${nf(l.mik)} adet</td></tr>`; }))}</div>`;
   const on = (q, fn) => { const b = $(q); if (b) b.onclick = fn; };
   on('#aYol', () => { v.durum = 'yolda'; save(); toast('Sevkiyat yolda.'); route(); });
@@ -209,54 +285,87 @@ function araclar() {
 /* ============ CARİ, FATURA, TAHSİLAT ============ */
 ROUTES.fatura = function (id) {
   if (!F) { view.innerHTML = '<div class="noperm"><h2>Tutarları görme yetkiniz yok</h2><p>Bu bölüm fiyat ve tutar yetkisi gerektirir.</p></div>'; return; }
-  const tab = ['kesilecek', 'kurum', 'tedarikci', 'vade', 'teminat'].includes(id) ? id : 'faturalar';
+  const tab = ['kesilecek', 'komisyon', 'kurum', 'tedarikci', 'vade'].includes(id) ? id : 'faturalar';
   const ft = S.faturalar.filter(inSir), kes = S.sevkiyatlar.filter(v => inSir(v) && v.durum === 'teslim' && !v.faturaId);
   const al = ft.reduce((t, f) => t + kalanF(f), 0), gec = ft.filter(gecikti).reduce((t, f) => t + kalanF(f), 0), borc = S.alimlar.filter(inSir).reduce((t, a) => t + alimKalan(a), 0);
+  const gel30 = ft.filter(f => diffDays(f.tarih, TODAY) >= -30).reduce((t, f) => t + gelir(f), 0), emB = ft.reduce((t, f) => t + emanet(f), 0);
+  const thB = f => f.tur === 'komisyon' ? `<button class="btn sm" data-th="${f.id}">Tahsilat gir</button>` : `<button class="btn sm" data-th="${f.id}">Tahsilat gir</button>`;
   let body = '';
-  if (tab === 'faturalar') body = tbl([['Fatura'], ['Kurum'], ['Tarih'], ['Vade'], ['Toplam (KDV dahil)', 'r'], ['Tahsil edilen', 'r'], ['Kalan', 'r'], ['', 'r']],
-    ft.slice().sort((a, b) => b.tarih.localeCompare(a.tarih)).map(f => `<tr class="${gecikti(f) ? 'crit' : ''}"><td data-l="Fatura"><b>${esc(f.no)}</b>${sirCol(f)}</td><td data-l="Kurum">${kurumAd(f.k)}</td><td data-l="Tarih">${trDate(f.tarih)}</td>
+  if (tab === 'faturalar') body = tbl([['Fatura'], ['Tür'], ['Kurum / müşteri'], ['Tarih'], ['Vade'], ['Toplam (KDV dahil)', 'r'], ['Gelir yazılan', 'r'], ['Kalan', 'r'], ['', 'r']],
+    ft.slice().sort((a, b) => b.tarih.localeCompare(a.tarih)).map(f => `<tr class="${gecikti(f) ? 'crit' : ''}" data-fat="${f.id}"><td data-l="Fatura"><b>${esc(f.no)}</b>${sirCol(f)}</td><td data-l="Tür" class="small">${FATURA_TUR[f.tur]}</td>
+      <td data-l="Kurum">${kurumAd(f.k)}${f.konu ? `<div class="small muted">${esc(f.konu)}</div>` : ''}</td><td data-l="Tarih">${trDate(f.tarih)}</td>
       <td data-l="Vade" class="${gecikti(f) ? 'bad' : ''}">${trDate(f.vade)}${gecikti(f) ? `<div class="small">${-diffDays(f.vade, TODAY)} gün gecikti</div>` : ''}</td>
-      <td data-l="Toplam" class="r num">${money(f.toplam)}</td><td data-l="Tahsil" class="r num">${money(tahsil(f))}</td><td data-l="Kalan" class="r num"><b class="${gecikti(f) ? 'bad' : ''}">${kalanF(f) > 0.5 ? money(kalanF(f)) : 'Kapandı'}</b></td>
-      <td class="r"><div class="acts" style="justify-content:flex-end">${kalanF(f) > 0.5 ? `<button class="btn sm" data-th="${f.id}">Tahsilat gir</button>` : ''}<a class="linkbtn" href="belge.html?tip=fatura&id=${f.id}">Fatura</a></div></td></tr>`));
-  if (tab === 'kesilecek') body = tbl([['Sevkiyat'], ['Kurum'], ['Teslim / tutanak'], ['Tutar (KDV hariç)', 'r'], ['', 'r']],
-    kes.map(v => `<tr><td data-l="Sevkiyat"><b>${esc(v.no)}</b><div class="small muted">${esc(soz(v.szId).no)}</div></td><td data-l="Kurum">${kurumAd(v.k)}</td><td data-l="Tutanak" class="small">${esc(v.tutanak.no)}, ${trDate(v.tutanak.tarih)}</td>
+      <td data-l="Toplam" class="r num">${money(f.toplam)}</td><td data-l="Gelir" class="r num">${money(gelir(f))}${f.tur === 'komisyon' ? '<div class="small muted">yalnız komisyon</div>' : ''}</td>
+      <td data-l="Kalan" class="r num"><b class="${gecikti(f) ? 'bad' : ''}">${kalanF(f) > 0.5 ? money(kalanF(f)) : 'Kapandı'}</b></td>
+      <td class="r"><div class="acts" style="justify-content:flex-end">${kalanF(f) > 0.5 ? thB(f) : ''}<a class="linkbtn" href="belge.html?tip=fatura&id=${f.id}">Fatura</a></div></td></tr>`));
+  if (tab === 'kesilecek') body = tbl([['Sevkiyat'], ['Kurum / müşteri'], ['Fatura türü'], ['Teslim / tutanak'], ['Tutar (KDV hariç)', 'r'], ['', 'r']],
+    kes.map(v => `<tr><td data-l="Sevkiyat"><b>${esc(v.no)}</b><div class="small muted">${esc(soz(v.szId).no)}</div></td><td data-l="Kurum">${kurumAd(v.k)}</td><td data-l="Tür" class="small">${FATURA_TUR[{ acik: 'ihale', dogrudan: 'dogrudan', piyasa: 'piyasa' }[soz(v.szId).tur || 'acik']]}</td><td data-l="Tutanak" class="small">${esc(v.tutanak.no)}, ${trDate(v.tutanak.tarih)}</td>
       <td data-l="Tutar" class="r num">${money(svCiro(v))}</td><td class="r"><button class="btn acc sm" data-fk="${v.id}">Fatura kes</button></td></tr>`), 'Faturası kesilecek teslimat yok. Kabul tutanağı girilen sevkiyatlar buraya düşer.');
-  if (tab === 'kurum') body = tbl([['Kurum'], ['Faturalanan', 'r'], ['Tahsil edilen', 'r'], ['Bakiye', 'r'], ['Vadesi geçen', 'r'], ['', 'r']],
-    S.kurumlar.map(k => { const fs = ft.filter(f => f.k === k.id); if (!fs.length) return ''; const g = fs.filter(gecikti).reduce((t, f) => t + kalanF(f), 0);
-      return `<tr><td data-l="Kurum"><b>${esc(k.ad)}</b></td><td data-l="Faturalanan" class="r num">${money0(fs.reduce((t, f) => t + f.toplam, 0))}</td><td data-l="Tahsil" class="r num">${money0(fs.reduce((t, f) => t + tahsil(f), 0))}</td>
-        <td data-l="Bakiye" class="r num"><b>${money0(fs.reduce((t, f) => t + kalanF(f), 0))}</b></td><td data-l="Vadesi geçen" class="r num ${g ? 'bad' : ''}">${money0(g)}</td><td class="r"><a class="linkbtn" href="belge.html?tip=ekstre&id=${k.id}">Ekstre</a></td></tr>`; }).filter(Boolean));
-  if (tab === 'tedarikci') body = `<div class="acts" style="margin-bottom:10px"><span class="small muted">Satın alma girişleri (Hammadde ve stok) tedarikçi carisine borç yazar.</span></div>` + tbl([['Tedarikçi'], ['Alımlar (KDV dahil)', 'r'], ['Ödenen', 'r'], ['Borç', 'r'], ['En yakın vade'], ['', 'r']],
+  if (tab === 'komisyon') {
+    const kl = ft.filter(f => f.tur === 'komisyon').sort((a, b) => b.tarih.localeCompare(a.tarih));
+    body = `<div class="note"><b>Komisyon usulü iş nasıl işlenir:</b> Kuruma kesilen fatura bedeli şirketin geliri değildir; yalnız komisyon gelir yazılır. Fatura bedeli "aracılık / emanet hesabı"nda izlenir: kurum ödeyince tutar emanet hesabına girer, komisyon ayrıldıktan sonra kalan asıl tedarikçiye aktarılır ve hesap kapanır.</div>
+      <div class="acts" style="margin-bottom:12px"><button class="btn" id="yKom">Yeni komisyon işi</button></div>` +
+      tbl([['İş'], ['Kurum'], ['Asıl tedarikçi'], ['Fatura bedeli', 'r'], ['Komisyon (gelir)', 'r'], ['Kurumdan tahsil', 'r'], ['Emanette (aktarılacak)', 'r'], ['Aktarılan', 'r'], ['', 'r']],
+        kl.map(f => `<tr data-kom="${f.id}"><td data-l="İş"><b>${esc(f.no)}</b><div class="small muted">${esc(f.konu)}</div></td><td data-l="Kurum">${kurumAd(f.k)}</td><td data-l="Tedarikçi" class="small">${esc(f.tedAd)}</td>
+          <td data-l="Fatura bedeli" class="r num">${money0(f.toplam)}</td><td data-l="Komisyon" class="r num"><b>${money0(f.komisyon)}</b></td><td data-l="Tahsil" class="r num">${money0(tahsil(f))}</td>
+          <td data-l="Emanette" class="r num" data-emanet="${f.id}">${emanet(f) > 0.5 ? `<b class="warn">${money0(emanet(f))}</b>` : money0(0)}</td><td data-l="Aktarılan" class="r num">${money0(aktarilan(f))}</td>
+          <td class="r"><div class="acts" style="justify-content:flex-end">${kalanF(f) > 0.5 ? `<button class="btn sm" data-th="${f.id}">Tahsilat gir</button>` : ''}${emanet(f) > 0.5 ? `<button class="btn sm acc" data-ak="${f.id}">Tedarikçiye aktar</button>` : ''}${kalanF(f) < 0.5 && emanet(f) < 0.5 ? '<span class="small ok">Kapandı</span>' : ''}</div></td></tr>`), 'Komisyon işi yok.');
+  }
+  if (tab === 'kurum') body = tbl([['Kurum / müşteri'], ['Faturalanan', 'r'], ['Tahsil edilen', 'r'], ['Fatura bakiyesi', 'r'], ['Vadesi geçen', 'r'], ['Teminat alacağı', 'r'], ['', 'r']],
+    S.kurumlar.map(k => { const fs = ft.filter(f => f.k === k.id), ta = teminatAlacak(k.id); if (!fs.length && !ta) return ''; const g = fs.filter(gecikti).reduce((t, f) => t + kalanF(f), 0);
+      return `<tr data-kcari="${k.id}"><td data-l="Kurum"><b>${esc(k.ad)}</b></td><td data-l="Faturalanan" class="r num">${money0(fs.reduce((t, f) => t + f.toplam, 0))}</td><td data-l="Tahsil" class="r num">${money0(fs.reduce((t, f) => t + tahsil(f), 0))}</td>
+        <td data-l="Bakiye" class="r num"><b>${money0(fs.reduce((t, f) => t + kalanF(f), 0))}</b></td><td data-l="Vadesi geçen" class="r num ${g ? 'bad' : ''}">${money0(g)}</td>
+        <td data-l="Teminat alacağı" class="r num" data-tal="${k.id}">${money0(ta)}</td><td class="r"><a class="linkbtn" href="belge.html?tip=ekstre&id=${k.id}">Ekstre</a></td></tr>`; }).filter(Boolean))
+    + '<p class="small muted" style="margin-top:8px">Teminat alacağı: kuruma verilen ve henüz iade alınmamış geçici ve kesin teminatlar. Ayrıntı "Verilen teminatlar" ekranında.</p>';
+  if (tab === 'tedarikci') body = `<div class="acts" style="margin-bottom:10px"><span class="small muted">Kalite onayıyla stoğa giren hammadde lotları tedarikçi carisine borç yazar.</span></div>` + tbl([['Tedarikçi'], ['Alımlar (KDV dahil)', 'r'], ['Ödenen', 'r'], ['Borç', 'r'], ['En yakın vade'], ['', 'r']],
     S.tedarikciler.map(t => { const as = S.alimlar.filter(a => a.tedId === t.id && inSir(a)); if (!as.length) return ''; const acik = as.filter(a => alimKalan(a) > 0).sort((a, b) => a.vade.localeCompare(b.vade)), b = as.reduce((s, a) => s + alimKalan(a), 0);
       return `<tr><td data-l="Tedarikçi"><b>${esc(t.ad)}</b><div class="small muted">${esc(t.il)}, vade ${t.vade} gün</div></td><td data-l="Alımlar" class="r num">${money0(as.reduce((s, a) => s + a.tutar, 0))}</td><td data-l="Ödenen" class="r num">${money0(as.reduce((s, a) => s + alimOdenen(a), 0))}</td>
         <td data-l="Borç" class="r num"><b>${money0(b)}</b></td><td data-l="En yakın vade" class="${acik[0] && acik[0].vade < TODAY ? 'bad' : ''}">${acik[0] ? trDate(acik[0].vade) : '-'}</td><td class="r">${b > 0 ? `<button class="btn sm alt" data-od="${t.id}">Ödeme gir</button>` : ''}</td></tr>`; }).filter(Boolean));
   if (tab === 'vade') {
     const rows = ft.filter(f => kalanF(f) > 0.5).map(f => ({ v: f.vade, tur: 'Tahsilat', cari: kurum(f.k).ad, belge: f.no, tutar: kalanF(f) }))
+      .concat(ft.filter(f => emanet(f) > 0.5).map(f => ({ v: TODAY, tur: 'Emanet', cari: f.tedAd, belge: f.no + ' (komisyon işi)', tutar: -emanet(f) })))
       .concat(S.alimlar.filter(a => inSir(a) && alimKalan(a) > 0).map(a => ({ v: a.vade, tur: 'Ödeme', cari: ted(a.tedId).ad, belge: a.belge, tutar: -alimKalan(a) }))).sort((a, b) => a.v.localeCompare(b.v));
     const grp = [['Vadesi geçenler', r => r.v < TODAY], ['Bu hafta', r => r.v >= TODAY && diffDays(r.v, TODAY) <= 7], ['8–30 gün', r => diffDays(r.v, TODAY) > 7 && diffDays(r.v, TODAY) <= 30], ['30 günden sonra', r => diffDays(r.v, TODAY) > 30]];
     body = `<div class="legend"><span style="--c:var(--ok)">Tahsil edilecek: ${money0(rows.filter(r => r.tutar > 0).reduce((t, r) => t + r.tutar, 0))}</span><span style="--c:var(--bad)">Ödenecek: ${money0(-rows.filter(r => r.tutar < 0).reduce((t, r) => t + r.tutar, 0))}</span></div>` +
       grp.map(([ad, fn]) => { const rs = rows.filter(fn); if (!rs.length) return ''; return `<h3 style="margin:14px 0 6px">${ad}</h3>` + tbl([['Vade'], ['Tür'], ['Cari'], ['Belge'], ['Tutar', 'r']],
-        rs.map(r => `<tr class="${r.v < TODAY ? 'crit' : ''}"><td data-l="Vade">${trDate(r.v)}<div class="small muted">${gunTxt(r.v)}</div></td><td data-l="Tür">${r.tutar > 0 ? tag('Tahsilat', 'g') : tag('Ödeme', 'a')}</td><td data-l="Cari">${esc(r.cari)}</td><td data-l="Belge" class="small">${esc(r.belge)}</td><td data-l="Tutar" class="r num">${money0(Math.abs(r.tutar))}</td></tr>`)); }).join('');
+        rs.map(r => `<tr class="${r.v < TODAY ? 'crit' : ''}"><td data-l="Vade">${trDate(r.v)}<div class="small muted">${gunTxt(r.v)}</div></td><td data-l="Tür">${r.tutar > 0 ? tag('Tahsilat', 'g') : r.tur === 'Emanet' ? tag('Emanet aktarımı', 'w') : tag('Ödeme', 'a')}</td><td data-l="Cari">${esc(r.cari)}</td><td data-l="Belge" class="small">${esc(r.belge)}</td><td data-l="Tutar" class="r num">${money0(Math.abs(r.tutar))}</td></tr>`)); }).join('');
   }
-  if (tab === 'teminat') body = tbl([['Mektup'], ['İş'], ['Banka'], ['Tutar', 'r'], ['Durum'], ['', 'r']],
-    S.ihaleler.filter(i => inSir(i) && i.durum !== 'hazirlaniyor').map(i => `<tr><td data-l="Mektup">Geçici teminat<div class="small muted">Bitiş ${trDate(i.gecici.bitis)}</div></td><td data-l="İş">${esc(i.ikn)}, ${kurumAd(i.k)}</td><td data-l="Banka" class="small">${esc(i.gecici.banka)}</td><td data-l="Tutar" class="r num">${money0(i.gecici.tutar)}</td>
-      <td data-l="Durum">${i.gecici.iade ? tag('İade alındı', 'g') : i.durum === 'teklif' ? tag('Kurumda, sonuç bekleniyor', 'b') : tag('İade istenecek', 'a')}</td><td class="r">${!i.gecici.iade && i.durum !== 'teklif' ? `<button class="linkbtn" data-gi="${i.id}">İade alındı</button>` : ''}</td></tr>`)
-    .concat(S.sozlesmeler.filter(inSir).map(z => `<tr><td data-l="Mektup">Kesin teminat<div class="small muted">${esc(z.kesin.no)}</div></td><td data-l="İş">${esc(z.no)}, ${kurumAd(z.k)}</td><td data-l="Banka" class="small">${esc(z.kesin.banka)}</td><td data-l="Tutar" class="r num">${money0(z.kesin.tutar)}</td>
-      <td data-l="Durum">${z.kesin.iade ? tag('İade alındı', 'g') : sozBitti(z) ? tag('İş bitti, iade istenecek', 'a') : tag('Kurumda, iş sürüyor', '')}</td><td class="r">${!z.kesin.iade && sozBitti(z) ? `<button class="linkbtn" data-ki="${z.id}">İade alındı</button>` : ''}</td></tr>`)));
-  view.innerHTML = `<div class="hd"><div><h1>Cari, fatura ve tahsilat</h1><p>Kurum alacakları, tedarikçi borçları, vade takvimi ve teminat mektupları.</p></div></div>
-    <div class="kpis" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr))">
-      <div class="kpi"><div class="v">${money0(al)}</div><div class="k">Kurumlardan alacak</div></div>
+  view.innerHTML = `<div class="hd"><div><h1>Cari, fatura ve tahsilat</h1><p>Kurum ve müşteri alacakları, komisyon işleri, tedarikçi borçları ve vade takvimi.</p></div></div>
+    <div class="kpis" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))">
+      <div class="kpi"><div class="v" id="kpAlacak">${money0(al)}</div><div class="k">Fatura alacağı</div></div>
       <div class="kpi ${gec ? 'alert' : ''}"><div class="v">${money0(gec)}</div><div class="k">Vadesi geçen alacak</div></div>
+      <div class="kpi"><div class="v" id="kpGelir">${money0(gel30)}</div><div class="k">Gelir, son 30 gün</div></div>
+      <div class="kpi"><div class="v" id="kpEmanet">${money0(emB)}</div><div class="k">Emanette, tedarikçiye aktarılacak</div></div>
       <div class="kpi"><div class="v">${money0(borc)}</div><div class="k">Tedarikçilere borç</div></div>
       <div class="kpi"><div class="v">${kes.length}</div><div class="k">Faturası kesilecek teslimat</div></div></div>
-    ${tabsHtml([['faturalar', 'Faturalar'], ['kesilecek', `Faturalanacak (${kes.length})`], ['kurum', 'Kurum carileri'], ['tedarikci', 'Tedarikçi carileri'], ['vade', 'Vade takvimi'], ['teminat', 'Teminatlar']], tab)}
+    ${tabsHtml([['faturalar', 'Faturalar'], ['kesilecek', `Faturalanacak (${kes.length})`], ['komisyon', 'Komisyon işleri ve emanet'], ['kurum', 'Kurum ve müşteri carileri'], ['tedarikci', 'Tedarikçi carileri'], ['vade', 'Vade takvimi']], tab)}
     ${sirNote()}<div class="card">${body}</div>`;
   bindTabs('fatura');
-  $$('[data-th]').forEach(b => b.onclick = () => { const f = fatura(b.dataset.th); modal('Tahsilat gir: ' + f.no, `<p class="small muted" style="margin-bottom:12px">${kurumAd(f.k)}, kalan ${money(kalanF(f))}. Kısmi tahsilat girilebilir.</p>
+  $$('[data-th]').forEach(b => b.onclick = () => { const f = fatura(b.dataset.th); modal('Tahsilat gir: ' + f.no, `<p class="small muted" style="margin-bottom:12px">${kurumAd(f.k)}, kalan ${money(kalanF(f))}. Kısmi tahsilat girilebilir.${f.tur === 'komisyon' ? ' Komisyon işi: tahsil edilen tutar emanet hesabına girer; komisyon payı gelir, kalanı asıl tedarikçiye aktarılır.' : ''}</p>
     <div class="fg"><label class="f"><span>Tutar (₺)</span><input class="inp" id="tt" value="${String(Math.round(kalanF(f) * 100) / 100).replace('.', ',')}" inputmode="decimal"></label><label class="f"><span>Tarih</span><input class="inp" type="date" id="td" value="${TODAY}"></label></div>
     <label class="f"><span>Açıklama</span><input class="inp" id="ta" value="Banka havalesi"></label>
     <div class="foot"><button class="btn alt" data-close>Vazgeç</button><button class="btn" id="tok">Tahsilatı kaydet</button></div>`, m => {
-    $('#tok', m).onclick = () => { const t = numIn($('#tt', m).value.replace(/\./g, '')); if (!(t > 0) || t > kalanF(f) + 0.01) return toast('Tutar 0 ile kalan arasında olmalı.'); f.tahsilat.push({ tarih: $('#td', m).value, tutar: t, ack: $('#ta', m).value }); save(); m.remove(); toast(kalanF(f) > 0.5 ? 'Kısmi tahsilat kaydedildi, kalan ' + money(kalanF(f)) : 'Fatura tamamen tahsil edildi.'); route(); };
+    $('#tok', m).onclick = () => { const t = numIn($('#tt', m).value.replace(/\./g, '')); if (!(t > 0) || t > kalanF(f) + 0.01) return toast('Tutar 0 ile kalan arasında olmalı.'); f.tahsilat.push({ tarih: $('#td', m).value, tutar: t, ack: $('#ta', m).value }); save(); m.remove();
+      toast(f.tur === 'komisyon' ? `Tahsilat emanet hesabına alındı: ${money0(emanet(f))} asıl tedarikçiye aktarılacak.` : kalanF(f) > 0.5 ? 'Kısmi tahsilat kaydedildi, kalan ' + money(kalanF(f)) : 'Fatura tamamen tahsil edildi.'); route(); };
   }); });
+  $$('[data-ak]').forEach(b => b.onclick = () => { const f = fatura(b.dataset.ak); modal('Tedarikçiye aktar: ' + f.tedAd, `<p class="small muted" style="margin-bottom:12px">${esc(f.konu)}. Emanette ${money(emanet(f))} var. Aktarım gelir veya gider değildir; emanet hesabını kapatır.</p>
+    <div class="fg"><label class="f"><span>Tutar (₺)</span><input class="inp" id="akt" value="${Math.round(emanet(f))}" inputmode="decimal"></label><label class="f"><span>Tarih</span><input class="inp" type="date" id="akd" value="${TODAY}"></label></div>
+    <div class="foot"><button class="btn alt" data-close>Vazgeç</button><button class="btn" id="akok">Aktarımı kaydet</button></div>`, m => {
+    $('#akok', m).onclick = () => { const t = numIn($('#akt', m).value); if (!(t > 0) || t > emanet(f) + 0.5) return toast('Tutar emanetteki tutarı geçemez.'); f.aktarim.push({ tarih: $('#akd', m).value, tutar: t }); save(); m.remove(); toast('Aktarım kaydedildi.'); route(); };
+  }); });
+  const yk = $('#yKom'); if (yk) yk.onclick = () => modal('Yeni komisyon işi', `<p class="small muted" style="margin-bottom:12px">Ürünü başka bir tedarikçi sağlar, fatura kuruma bizden kesilir; gelir yalnız komisyondur.</p>
+    <label class="f"><span>Kurum / müşteri</span><select class="inp" id="kk">${S.kurumlar.map(k => `<option value="${k.id}">${esc(k.ad)}</option>`).join('')}</select></label>
+    <label class="f"><span>İşin konusu</span><input class="inp" id="kkonu" placeholder="Örn. Temizlik ekipmanı temini"></label>
+    <label class="f"><span>Asıl tedarikçi</span><input class="inp" id="kted" placeholder="Örn. Ege Temizlik Ekipmanları Ltd."></label>
+    <div class="fg"><label class="f"><span>Fatura bedeli (₺, KDV dahil)</span><input class="inp" id="kbed" inputmode="decimal" placeholder="100000"></label><label class="f"><span>Komisyon (₺)</span><input class="inp" id="kkom" inputmode="decimal" placeholder="10000"></label>
+    <label class="f"><span>Fatura tarihi</span><input class="inp" type="date" id="ktar" value="${TODAY}"></label></div>
+    <div class="foot"><button class="btn alt" data-close>Vazgeç</button><button class="btn" id="kok">Faturayı kes</button></div>`, m => {
+    $('#kok', m).onclick = () => { const bed = numIn($('#kbed', m).value), kom = numIn($('#kkom', m).value);
+      if (!$('#kkonu', m).value.trim() || !$('#kted', m).value.trim()) return toast('Konu ve asıl tedarikçiyi girin.');
+      if (!(bed > 0) || !(kom > 0) || kom >= bed) return toast('Komisyon, fatura bedelinden küçük olmalı.');
+      const f = mkKomisyon(S, { sir: yeniSir(), k: $('#kk', m).value, konu: $('#kkonu', m).value.trim(), tedAd: $('#kted', m).value.trim(), bedel: bed, komisyon: kom, tarih: $('#ktar', m).value }); save(); m.remove();
+      toast(`Komisyon faturası ${f.no} kesildi: ${money0(bed)} emanet hesabında, gelir ${money0(kom)}.`); route(); };
+  });
   $$('[data-fk]').forEach(b => b.onclick = () => { const v = sevk(b.dataset.fk), mat = svCiro(v), k = kurum(v.k); modal('Fatura kes: ' + v.no, `
     <div class="meta" style="margin-bottom:12px"><div><small>Matrah</small><b class="num">${money(mat)}</b></div><div><small>KDV %20</small><b class="num">${money(mat * 0.2)}</b></div><div><small>Toplam</small><b class="num">${money(mat * 1.2)}</b></div></div>
     <div class="fg"><label class="f"><span>Fatura tarihi</span><input class="inp" type="date" id="fd" value="${TODAY}"></label><label class="f"><span>Vade (${k.vade} gün)</span><input class="inp" type="date" id="fv" value="${addDays(TODAY, k.vade)}"></label></div>
@@ -270,8 +379,36 @@ ROUTES.fatura = function (id) {
       <div class="foot"><button class="btn alt" data-close>Vazgeç</button><button class="btn" id="ook">Ödemeyi kaydet</button></div>`, m => {
       $('#ook', m).onclick = () => { let t2 = numIn($('#ot', m).value); if (!(t2 > 0) || t2 > top + 0.01) return toast('Tutar 0 ile borç arasında olmalı.'); as.forEach(a => { if (t2 <= 0) return; const k = Math.min(t2, alimKalan(a)); a.odeme.push({ tarih: $('#odt', m).value, tutar: k }); t2 -= k; }); save(); m.remove(); toast('Ödeme kaydedildi.'); route(); };
     }); });
-  $$('[data-gi]').forEach(b => b.onclick = () => { ihale(b.dataset.gi).gecici.iade = true; save(); toast('Geçici teminat iadesi kaydedildi.'); route(); });
-  $$('[data-ki]').forEach(b => b.onclick = () => { const z = soz(b.dataset.ki); z.kesin.iade = true; z.kesin.iadeTarih = TODAY; save(); toast('Kesin teminat iadesi kaydedildi.'); route(); });
+};
+
+/* ============ VERİLEN TEMİNATLAR ============ */
+let tmQ = '';
+ROUTES.teminat = function (id) {
+  const tab = id === 'kesin' ? 'kesin' : 'gecici';
+  const all = teminatlar().filter(inSir), list = all.filter(x => x.cins === tab && (!tmQ || x.ikn.toLowerCase().includes(tmQ.toLowerCase()) || (x.szNo || '').toLowerCase().includes(tmQ.toLowerCase())))
+    .sort((a, b) => (b.unutuldu - a.unutuldu) || (a.t.iade - b.t.iade) || (b.bekleme - a.bekleme));
+  const kurumda = all.filter(x => !x.t.iade), unut = all.filter(x => x.unutuldu);
+  view.innerHTML = `<div class="hd"><div><h1>Verilen teminatlar</h1><p>Kurumlara verilen geçici ve kesin teminatlar. Kurumda bekleyen her teminat, kurumun cari hesabında alacak olarak durur.</p></div></div>
+    <div class="kpis" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr))">
+      <div class="kpi"><div class="v" id="kpTeminat">${F ? money0(kurumda.reduce((t, x) => t + x.t.tutar, 0)) : kurumda.length + ' adet'}</div><div class="k">Kurumda bekleyen toplam teminat</div></div>
+      <div class="kpi ${unut.length ? 'alert' : ''}"><div class="v" id="kpUnutulan">${unut.length}</div><div class="k">İade edilebilir, 30+ gündür kurumda</div></div>
+      ${F ? `<div class="kpi ${unut.length ? 'alert' : ''}"><div class="v">${money0(unut.reduce((t, x) => t + x.t.tutar, 0))}</div><div class="k">Unutulan teminat tutarı</div></div>` : ''}
+    </div>
+    ${unut.length ? `<div class="note w"><b>Unutulan teminat uyarısı:</b> ${unut.length} teminat iade edilebilir olduğu hâlde 30 günden uzun süredir kurumda bekliyor. Satırdaki "İade talep yazısı" ile kuruma hitaben yazı hazırlanır.</div>` : ''}
+    ${tabsHtml([['gecici', `Geçici teminatlar (${all.filter(x => x.cins === 'gecici').length})`], ['kesin', `Kesin teminatlar (${all.filter(x => x.cins === 'kesin').length})`]], tab)}
+    <div class="acts" style="margin-bottom:12px"><label class="small" for="tmq">İhale numarası (İKN) ile ara</label><input class="inp sm" id="tmq" value="${esc(tmQ)}" placeholder="Örn. 2026/1384521" style="min-width:220px" autocomplete="off"></div>
+    <div class="card">${tbl([['İKN'], ['Kurum'], ['Tür'], ...(F ? [['Tutar', 'r']] : []), ['Banka / mektup no'], ['Veriliş'], ['İade edilebilir'], ['Durum'], ['', 'r']],
+      list.map(x => `<tr class="${x.unutuldu ? 'crit' : ''}" data-tm="${x.id}"><td data-l="İKN"><b>${esc(x.ikn)}</b>${x.szNo ? `<div class="small muted">${esc(x.szNo)}</div>` : ''}</td><td data-l="Kurum">${kurumAd(x.k)}</td>
+        <td data-l="Tür" class="small">${x.t.tur === 'nakit' ? 'Nakit' : 'Teminat mektubu'}</td>${F ? `<td data-l="Tutar" class="r num">${money0(x.t.tutar)}</td>` : ''}
+        <td data-l="Banka" class="small">${x.t.tur === 'nakit' ? 'Kurum hesabına yatırıldı' : esc(x.t.banka) + '<br>' + esc(x.t.no)}</td><td data-l="Veriliş">${trDate(x.t.verilis)}</td>
+        <td data-l="İade edilebilir" class="small">${x.iadeEd ? trDate(x.iadeEd) + (x.t.iade ? '' : `<div class="${x.unutuldu ? 'bad' : 'muted'}">${x.bekleme} gündür bekliyor</div>`) : `<span class="muted">${x.cins === 'gecici' ? 'İhale sonuçlanınca / sözleşmede' : 'İşin kabulünden sonra'}</span>`}</td>
+        <td data-l="Durum">${x.t.iade ? tag('İade alındı, ' + trDate(x.t.iadeTarih), 'g') : x.t.talep ? tag('İade talep edildi', 'b') : x.unutuldu ? tag('Kurumda, unutulmuş', 'r') : tag('Kurumda', '')}</td>
+        <td class="r"><div class="acts" style="justify-content:flex-end">${!x.t.iade && x.iadeEd ? `<a class="linkbtn" data-talep="${x.id}" href="belge.html?tip=iade&id=${x.id}">İade talep yazısı</a><button class="btn sm" data-iade="${x.id}">İade alındı</button>` : ''}</div></td></tr>`), tmQ ? 'Bu numarayla teminat bulunamadı.' : 'Kayıt yok.')}</div>
+    <p class="small muted" style="margin-top:8px">İade edilebilir tarih: geçici teminatta ihale sonucu (kaybedilen ihale) veya sözleşme imzası; kesin teminatta son kabul tutanağı. Teminat iade alınınca kurum carisindeki teminat alacağı düşer.</p>`;
+  bindTabs('teminat');
+  const q = $('#tmq'); q.oninput = () => { tmQ = q.value; const pos = q.selectionStart; ROUTES.teminat(tab); const q2 = $('#tmq'); q2.focus(); q2.setSelectionRange(pos, pos); };
+  $$('[data-talep]').forEach(a => a.onclick = () => { const x = teminatlar().find(t => t.id === a.dataset.talep); if (!x.t.talep) { x.t.talep = TODAY; save(); } });
+  $$('[data-iade]').forEach(b => b.onclick = () => { const x = teminatlar().find(t => t.id === b.dataset.iade); x.t.iade = true; x.t.iadeTarih = TODAY; save(); toast(`Teminat iade alındı; ${kurum(x.k).ad} carisinden düşüldü.`); route(); });
 };
 
 /* ============ ÜRÜNLER ============ */
@@ -315,37 +452,45 @@ function urunDetay(id) {
 ROUTES.stok = function (id) {
   const tab = ['ambalaj', 'hareket'].includes(id) ? id : 'hammadde';
   const son = hid => S.hareketler.filter(x => x.hid === hid).sort((a, b) => b.tarih.localeCompare(a.tarih))[0];
+  const kar = hid => S.lotlar.filter(l => l.hid === hid && l.durum === 'karantina').reduce((t, l) => t + l.mik, 0);
   let body;
   if (tab === 'hareket') body = tbl([['Tarih'], ['Malzeme'], ['Miktar', 'r'], ['Tür'], ['Açıklama']], S.hareketler.slice().sort((a, b) => b.tarih.localeCompare(a.tarih) || b.id.localeCompare(a.id)).slice(0, 80).map(x => { const h = hm(x.hid);
     return `<tr><td data-l="Tarih">${trDate(x.tarih)}</td><td data-l="Malzeme">${esc(h.ad)}</td><td data-l="Miktar" class="r num ${x.mik < 0 ? 'bad' : 'ok'}">${x.mik > 0 ? '+' : ''}${nf(x.mik)} ${h.birim}</td><td data-l="Tür">${esc(x.tip)}</td><td data-l="Açıklama" class="small">${esc(x.ack)}</td></tr>`; }));
-  else body = tbl([['Malzeme'], ['Stok', 'r'], ['Kritik seviye', 'r'], ['Durum'], ...(M || F ? [['Birim fiyat', 'r'], ['Stok değeri', 'r']] : []), ['Tedarikçi'], ['Son hareket']],
-    S.hammaddeler.filter(h => h.tur === tab).map(h => { const s = son(h.id), k = h.stok < h.kritik; return `<tr class="${k ? 'crit' : ''}"><td data-l="Malzeme"><b>${esc(h.ad)}</b></td><td data-l="Stok" class="r num" data-stok="${h.id}">${nf(h.stok)} ${h.birim}</td><td data-l="Kritik" class="r num">${nf(h.kritik)} ${h.birim}</td>
+  else body = tbl([['Malzeme'], ['Kullanılabilir stok', 'r'], ['Karantinada', 'r'], ['Kritik seviye', 'r'], ['Durum'], ...(M || F ? [['Birim fiyat', 'r'], ['Stok değeri', 'r']] : []), ['Tedarikçi'], ['Son hareket']],
+    S.hammaddeler.filter(h => h.tur === tab).map(h => { const s = son(h.id), k = h.stok < h.kritik, q = kar(h.id); return `<tr class="${k ? 'crit' : ''}"><td data-l="Malzeme"><b>${esc(h.ad)}</b></td><td data-l="Kullanılabilir" class="r num" data-stok="${h.id}">${nf(h.stok)} ${h.birim}</td>
+      <td data-l="Karantinada" class="r num" data-kar="${h.id}">${q ? `<span class="warn">${nf(q)} ${h.birim}</span>` : '<span class="muted">-</span>'}</td><td data-l="Kritik" class="r num">${nf(h.kritik)} ${h.birim}</td>
       <td data-l="Durum">${k ? tag('Kritik', 'r') : h.stok < h.kritik * 1.4 ? tag('Azalıyor', 'w') : tag('Yeterli', 'g')}</td>${M || F ? `<td data-l="Birim fiyat" class="r num">${money(h.fiyat)}</td><td data-l="Değer" class="r num">${money0(h.stok * h.fiyat)}</td>` : ''}
       <td data-l="Tedarikçi" class="small">${esc(ted(h.ted).ad)}</td><td data-l="Son hareket" class="small">${s ? trDate(s.tarih) + ', ' + esc(s.tip) : '-'}</td></tr>`; }));
-  view.innerHTML = `<div class="hd"><div><h1>Hammadde ve stok</h1><p>Üretimde reçeteye göre otomatik düşer; satın alma girişi stoku artırır ve tedarikçi carisine borç yazar.</p></div><button class="btn" id="sa">Satın alma girişi</button></div>
-    ${tabsHtml([['hammadde', 'Hammaddeler'], ['ambalaj', 'Ambalaj'], ['hareket', 'Stok hareketleri']], tab)}<div class="card">${body}</div>`;
+  view.innerHTML = `<div class="hd"><div><h1>Hammadde ve stok</h1><p>Gelen malzeme önce karantinaya alınır; hammadde giriş kontrolü onaylayınca kullanılabilir stoğa geçer ve tedarikçi carisine borç yazılır. Üretimde reçeteye göre düşer.</p></div><button class="btn" id="sa">Mal kabul (satın alma girişi)</button></div>
+    ${tabsHtml([['hammadde', 'Hammaddeler'], ['ambalaj', 'Ambalaj'], ['hareket', 'Stok hareketleri']], tab)}
+    ${S.lotlar.some(l => l.durum === 'karantina') ? `<div class="note">${S.lotlar.filter(l => l.durum === 'karantina').length} lot karantinada kalite onayı bekliyor; bu miktarlar üretimde kullanılamaz.${can('kalite') ? ' <a href="#kalite/hm">Giriş kontrolüne git</a>' : ''}</div>` : ''}
+    <div class="card">${body}</div>`;
   bindTabs('stok');
-  $('#sa').onclick = () => modal('Satın alma girişi', `<label class="f"><span>Malzeme</span><select class="inp" id="sh">${S.hammaddeler.map(h => `<option value="${h.id}">${esc(h.ad)} (${h.birim})</option>`).join('')}</select></label>
+  $('#sa').onclick = () => modal('Mal kabul (satın alma girişi)', `<p class="small muted" style="margin-bottom:12px">Gelen lot karantinaya alınır, kalite onayından sonra stoğa girer.</p>
+    <label class="f"><span>Malzeme</span><select class="inp" id="sh">${S.hammaddeler.map(h => `<option value="${h.id}">${esc(h.ad)} (${h.birim})</option>`).join('')}</select></label>
     <div class="fg"><label class="f"><span>Miktar</span><input class="inp" id="sm" inputmode="decimal" placeholder="Örn. 1000"></label>
     ${F || M ? '<label class="f"><span>Birim fiyat (₺, KDV hariç)</span><input class="inp" id="sf" inputmode="decimal"></label>' : ''}
     <label class="f"><span>Tedarikçi</span><select class="inp" id="st">${S.tedarikciler.map(t => `<option value="${t.id}">${esc(t.ad)}</option>`).join('')}</select></label>
-    <label class="f"><span>İrsaliye / fatura no</span><input class="inp" id="sb" value="F-${7800 + S.seq.alim}"></label></div>
-    <div class="foot"><button class="btn alt" data-close>Vazgeç</button><button class="btn" id="sok">Stoka ekle</button></div>`, m => {
+    <label class="f"><span>İrsaliye / fatura no</span><input class="inp" id="sb" value="İrs. ${5600 + S.seq.lot}"></label></div>
+    <div class="foot"><button class="btn alt" data-close>Vazgeç</button><button class="btn" id="sok">Karantinaya al</button></div>`, m => {
     const sync = () => { const h = hm($('#sh', m).value); $('#st', m).value = h.ted; if ($('#sf', m)) $('#sf', m).value = String(h.fiyat).replace('.', ','); };
     $('#sh', m).onchange = sync; sync();
-    $('#sok', m).onclick = () => { const h = hm($('#sh', m).value), mik = numIn($('#sm', m).value), fy = $('#sf', m) ? numIn($('#sf', m).value) || h.fiyat : h.fiyat, t = ted($('#st', m).value);
+    $('#sok', m).onclick = () => { const h = hm($('#sh', m).value), mik = numIn($('#sm', m).value), fy = $('#sf', m) ? numIn($('#sf', m).value) || h.fiyat : h.fiyat;
       if (!(mik > 0)) return toast('Miktar girin.');
-      h.stok = +(h.stok + mik).toFixed(3); h.fiyat = fy;
-      S.hareketler.push({ id: 'hr' + (++S.seq.hrk), tarih: TODAY, hid: h.id, mik, tip: 'Satın alma', ack: t.ad + ', ' + $('#sb', m).value });
-      S.alimlar.push({ id: 'al' + (++S.seq.alim), sir: yeniSir(), tedId: t.id, hid: h.id, mik, fiyat: fy, tarih: TODAY, vade: addDays(TODAY, t.vade), tutar: Math.round(mik * fy * 1.2), belge: $('#sb', m).value, odeme: [] });
-      save(); m.remove(); toast(h.ad + ' stoğa eklendi: +' + nf(mik) + ' ' + h.birim); route(); };
+      const l = { id: 'lt' + (++S.seq.lot) + 'n', no: nextNo(S, 'HL', TODAY), sir: yeniSir(), hid: h.id, mik, tedId: $('#st', m).value, fiyat: fy, tarih: TODAY, belge: $('#sb', m).value, durum: 'karantina', olcum: null, kkKisi: null, kkTarih: null, kkNot: '' };
+      S.lotlar.push(l); save(); m.remove(); toast(`Lot ${l.no} karantinada; kalite onayından sonra stoğa girer.`); route(); };
   });
 };
 
 /* ============ PERSONEL ============ */
-let puTarih = TODAY, isTarih = TODAY;
+let puTarih = TODAY, isTarih = TODAY, bAy = addDays(TODAY.slice(0, 8) + '01', -1).slice(0, 7);
+const canMaas = () => ME.rol === 'yonetici' || ME.rol === 'muhasebe';
+const ayAd = ay => new Date(ay + '-15T12:00:00').toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' });
+const ayListe = () => [...new Set(Object.keys(S.puantaj).map(t => t.slice(0, 7)).concat([TODAY.slice(0, 7)]))].sort().reverse();
 ROUTES.personel = function (id) {
-  const tab = ['isler', 'liste'].includes(id) ? id : 'puantaj';
+  if (id && id.startsWith('kart-')) return personelKart(id.slice(5));
+  const cm = canMaas();
+  const tab = ['isler', 'liste'].includes(id) || (id === 'bordro' && cm) ? id : 'puantaj';
   const ps = S.personel.filter(p => p.aktif && inSir(p) && (!ME.ekip || p.ekip === ME.ekip));
   let body = '';
   if (tab === 'puantaj') {
@@ -369,14 +514,40 @@ ROUTES.personel = function (id) {
       <h3 style="margin:16px 0 8px">İş ata</h3>
       <div class="acts"><select class="inp sm" id="ip" aria-label="Personel">${ps.map(p => `<option value="${p.id}">${esc(p.ad)}</option>`).join('')}</select><input class="inp sm" id="ii" placeholder="Yapılacak iş" style="flex:1;min-width:200px" aria-label="Yapılacak iş"><button class="btn sm" id="iadd">Ata</button></div>`;
   }
-  if (tab === 'liste') body = tbl([['Ad soyad'], ['Görev'], ['Çalışma yeri'], ['Ekip'], ['Şirket']], ps.map(p => `<tr><td data-l="Ad"><b>${esc(p.ad)}</b></td><td data-l="Görev">${esc(p.gorev)}</td><td data-l="Yer">${p.tip}</td><td data-l="Ekip">${{ uretim: 'Üretim', sevkiyat: 'Sevkiyat', kalite: 'Kalite', ofis: 'Ofis' }[p.ekip]}</td><td data-l="Şirket" class="small">${esc(sirket(p.sir).kisa)}</td></tr>`))
+  if (tab === 'liste') body = tbl([['Ad soyad'], ['Görev'], ['Çalışma yeri'], ['Ekip'], ['Şirket'], ...(cm ? [['Aylık net maaş', 'r']] : [])], ps.map(p => `<tr class="click" data-go="personel/kart-${p.id}"><td data-l="Ad"><b>${esc(p.ad)}</b></td><td data-l="Görev">${esc(p.gorev)}</td><td data-l="Yer">${p.tip}</td><td data-l="Ekip">${{ uretim: 'Üretim', sevkiyat: 'Sevkiyat', kalite: 'Kalite', ofis: 'Ofis' }[p.ekip]}</td><td data-l="Şirket" class="small">${esc(sirket(p.sir).kisa)}</td>${cm ? `<td data-l="Maaş" class="r num">${money0(p.maas || 0)}</td>` : ''}</tr>`))
     + '<div class="acts" style="margin-top:12px"><button class="btn" id="yper">Personel ekle</button></div>';
-  view.innerHTML = `<div class="hd"><div><h1>Personel ve puantaj</h1><p>${ME.ekip ? 'Ekibinizin' : 'Fabrika, ofis ve şoför personelinin'} günlük puantajı ve iş takibi.${ME.ekip ? ' Yalnız kendi ekibinizi görürsünüz.' : ''}</p></div></div>
-    ${tabsHtml([['puantaj', 'Günlük puantaj'], ['isler', 'Günlük işler'], ['liste', 'Personel listesi']], tab)}<div class="card">${body}</div>`;
-  bindTabs('personel');
+  if (tab === 'bordro') {
+    const artiC = S.bordroCols.filter(c => c.tur === 'arti'), kesC = S.bordroCols.filter(c => c.tur === 'kesinti');
+    const ns = ps.map(p => ({ p, n: netOdeme(p, bAy) })), sum = f => ns.reduce((t, x) => t + f(x), 0);
+    const inp = (p, c, n) => `<td class="r"><input class="inp sm num" data-bc="${p.id}|${c.k}" value="${n.b[c.k] || ''}" placeholder="0" style="width:84px" aria-label="${esc(p.ad)} ${esc(c.ad)}"></td>`;
+    body = `<div class="acts" style="margin-bottom:12px"><label class="small" for="bay">Ay</label><select class="inp sm" id="bay">${ayListe().map(a => `<option value="${a}" ${a === bAy ? 'selected' : ''}>${ayAd(a)}</option>`).join('')}</select>
+        <button class="btn sm alt" id="bcol">Sütun ekle</button><button class="btn sm alt" id="bcsv">Excel'e aktar</button></div>
+      <p class="small muted yatay" style="margin-bottom:6px">Tabloyu yana kaydırarak artı, kesinti ve net ödeme sütunlarını görün.</p>
+      <div class="tw"><table class="t" id="bordro"><thead><tr><th>Personel</th><th class="r">Aylık net maaş</th><th class="r">Çalışılan gün</th><th class="r">İzin</th><th class="r">Rapor</th><th class="r">Devamsızlık</th><th class="r">F. mesai (sa)</th><th class="r">Maaş payı</th><th class="r ok">+ F. mesai ücreti</th>
+        ${artiC.map(c => `<th class="r ok">+ ${esc(c.ad)}</th>`).join('')}${kesC.map(c => `<th class="r bad">− ${esc(c.ad)}</th>`).join('')}<th class="r">Net ödenecek</th></tr></thead><tbody>
+        ${ns.map(({ p, n }) => `<tr><td class="nowrap"><a href="#personel/kart-${p.id}">${esc(p.ad)}</a><div class="small muted">${esc(p.gorev)}</div></td><td class="r num">${money0(p.maas)}</td>
+          <td class="r">${n.o.ucretli} / ${n.o.ayGun}</td><td class="r">${n.o.izinli}</td><td class="r">${n.o.rapor}</td><td class="r ${n.o.gelmedi ? 'bad' : ''}">${n.o.gelmedi}</td><td class="r">${nf(n.o.mesai)}</td>
+          <td class="r num">${money(n.maasPay)}</td><td class="r num">${money0(n.fm)}</td>${artiC.map(c => inp(p, c, n)).join('')}${kesC.map(c => inp(p, c, n)).join('')}
+          <td class="r num"><b data-net="${p.id}">${money(n.net)}</b></td></tr>`).join('')}</tbody>
+        <tfoot><tr><td>Toplam (${ns.length} kişi)</td><td class="r num">${money0(sum(x => x.p.maas))}</td><td colspan="5"></td><td class="r num">${money0(sum(x => x.n.maasPay))}</td><td class="r num">${money0(sum(x => x.n.fm))}</td>
+          ${artiC.concat(kesC).map(c => `<td class="r num">${money0(sum(x => x.n.b[c.k] || 0))}</td>`).join('')}<td class="r num" id="netTop">${money(sum(x => x.n.net))}</td></tr></tfoot></table></div>
+      <p class="small muted" style="margin-top:8px"><b>Net ödeme hesabıdır; resmî SGK ve vergi bordrosu değildir.</b> Net ödenecek = maaş × (çalışılan gün / ay gün sayısı) + artılar − kesintiler. Çalışılan gün = ay gün sayısı − devamsızlık − rapor (hafta tatili ve yıllık izin ücretli sayılır). Fazla mesai ücreti = saat × (maaş / 225) × 1,5. Avans ve cezalar personel kartından da girilir.</p>`;
+  }
+  view.innerHTML = `<div class="hd"><div><h1>Personel ve puantaj</h1><p>${ME.ekip ? 'Ekibinizin' : 'Fabrika, ofis ve şoför personelinin'} günlük puantajı ve iş takibi${cm ? ', aylık net ödeme hesabı' : ''}.${ME.ekip ? ' Yalnız kendi ekibinizi görürsünüz.' : ''}</p></div></div>
+    ${tabsHtml([['puantaj', 'Günlük puantaj'], ['isler', 'Günlük işler'], ['liste', 'Personel listesi'], ...(cm ? [['bordro', 'Aylık özet ve net ödeme']] : [])], tab)}<div class="card">${body}</div>`;
+  bindTabs('personel'); bindClicks();
   const on = (q, f) => { const b = $(q); if (b) b.onclick = f; };
   if ($('#pt')) $('#pt').onchange = e => { puTarih = e.target.value; route(); };
   if ($('#it')) $('#it').onchange = e => { isTarih = e.target.value; route(); };
+  if ($('#bay')) $('#bay').onchange = e => { bAy = e.target.value; route(); };
+  $$('[data-bc]').forEach(i => i.onchange = () => { const [pid, k] = i.dataset.bc.split('|'); const b = S.bordro[bAy] = S.bordro[bAy] || {}; b[pid] = b[pid] || {}; b[pid][k] = numIn(i.value) || 0; save(); ROUTES.personel('bordro'); });
+  on('#bcol', () => modal('Sütun ekle', `<label class="f"><span>Sütun adı</span><input class="inp" id="cad" placeholder="Örn. Yol yardımı"></label>
+    <label class="f"><span>Tür</span><select class="inp" id="ctur"><option value="arti">Artı (ek ödeme)</option><option value="kesinti">Kesinti</option></select></label>
+    <div class="foot"><button class="btn alt" data-close>Vazgeç</button><button class="btn" id="cok">Ekle</button></div>`, m => {
+    $('#cok', m).onclick = () => { const ad = $('#cad', m).value.trim(); if (!ad) return toast('Sütun adı girin.'); S.bordroCols.push({ k: 'c' + Date.now(), ad, tur: $('#ctur', m).value }); save(); m.remove(); toast('"' + ad + '" sütunu eklendi.'); route(); };
+  }));
+  on('#bcsv', () => { const cols = S.bordroCols; csvIndir('net-odeme-' + bAy, [['Personel', 'Görev', 'Aylık net maaş', 'Çalışılan gün', 'Ay gün', 'İzin', 'Rapor', 'Devamsızlık', 'Fazla mesai saat', 'Maaş payı', 'Fazla mesai ücreti', ...cols.map(c => (c.tur === 'arti' ? '+ ' : '- ') + c.ad), 'Net ödenecek'],
+    ...ps.map(p => { const n = netOdeme(p, bAy); return [p.ad, p.gorev, p.maas, n.o.ucretli, n.o.ayGun, n.o.izinli, n.o.rapor, n.o.gelmedi, n.o.mesai, n.maasPay.toFixed(2).replace('.', ','), n.fm, ...cols.map(c => n.b[c.k] || 0), n.net.toFixed(2).replace('.', ',')]; })]); toast('Net ödeme tablosu CSV olarak indirildi.'); });
   on('#hepGeldi', () => $$('[data-pd]').forEach(s => { if (!s.value) s.value = 'geldi'; }));
   on('#puKaydet', () => { const pz = S.puantaj[puTarih] = S.puantaj[puTarih] || {}; $$('[data-pd]').forEach(s => { const pid = s.dataset.pd; if (s.value) pz[pid] = { d: s.value, mesai: numIn($(`[data-pm="${pid}"]`).value) || 0 }; else delete pz[pid]; }); save(); toast('Puantaj kaydedildi.'); route(); });
   $$('[data-is]').forEach(c => c.onchange = () => { S.isler.find(x => x.id === c.dataset.is).yapildi = c.checked; save(); route(); });
@@ -384,30 +555,69 @@ ROUTES.personel = function (id) {
   on('#yper', () => modal('Personel ekle', `<div class="fg"><label class="f"><span>Ad soyad</span><input class="inp" id="pa"></label><label class="f"><span>Görev</span><input class="inp" id="pg" value="Dolum hattı operatörü"></label>
     <label class="f"><span>Çalışma yeri</span><select class="inp" id="py"><option>Fabrika</option><option>Ofis</option><option>Şoför</option></select></label>
     <label class="f"><span>Ekip</span><select class="inp" id="pe"><option value="uretim">Üretim</option><option value="sevkiyat">Sevkiyat</option><option value="kalite">Kalite</option><option value="ofis">Ofis</option></select></label>
-    <label class="f"><span>Şirket</span><select class="inp" id="ps">${S.sirketler.filter(s => ME.sirketler.includes(s.id)).map(s => `<option value="${s.id}">${esc(s.kisa)}</option>`).join('')}</select></label></div>
+    <label class="f"><span>Şirket</span><select class="inp" id="ps">${S.sirketler.filter(s => ME.sirketler.includes(s.id)).map(s => `<option value="${s.id}">${esc(s.kisa)}</option>`).join('')}</select></label>
+    ${cm ? '<label class="f"><span>Aylık net maaş (₺)</span><input class="inp" id="pm" inputmode="decimal" value="32000"></label>' : ''}</div>
     <div class="foot"><button class="btn alt" data-close>Vazgeç</button><button class="btn" id="pok">Kaydet</button></div>`, m => {
     if (ME.ekip) { $('#pe', m).value = ME.ekip; $('#pe', m).disabled = true; }
-    $('#pok', m).onclick = () => { const ad = $('#pa', m).value.trim(); if (!ad) return toast('Ad soyad girin.'); S.personel.push({ id: 'pr' + (++S.seq.per), ad, gorev: $('#pg', m).value, tip: $('#py', m).value, ekip: $('#pe', m).value, sir: $('#ps', m).value, aktif: true }); save(); m.remove(); toast(ad + ' personel listesine eklendi.'); route(); };
+    $('#pok', m).onclick = () => { const ad = $('#pa', m).value.trim(); if (!ad) return toast('Ad soyad girin.'); S.personel.push({ id: 'pr' + (++S.seq.per), ad, gorev: $('#pg', m).value, tip: $('#py', m).value, ekip: $('#pe', m).value, sir: $('#ps', m).value, aktif: true, maas: $('#pm', m) ? numIn($('#pm', m).value) || 0 : 0 }); save(); m.remove(); toast(ad + ' personel listesine eklendi.'); route(); };
   }));
 };
+function personelKart(pid) {
+  const p = per(pid), cm = canMaas();
+  if (!p || (ME.ekip && p.ekip !== ME.ekip)) { view.innerHTML = '<div class="noperm"><h2>Bu personel kartını göremezsiniz</h2></div>'; return; }
+  const aylar = ayListe().slice(0, 2), n = cm ? netOdeme(p, bAy) : null;
+  const logs = S.bordroLog.filter(x => x.pid === p.id).sort((a, b) => b.tarih.localeCompare(a.tarih));
+  view.innerHTML = `<a class="back" href="#personel/liste">Personel listesine dön</a>
+    <div class="hd"><div><h1>${esc(p.ad)}</h1><p>${esc(p.gorev)}, ${p.tip}, ${esc(sirket(p.sir).kisa)}</p></div></div>
+    <div class="meta"><div><small>Ekip</small><b>${{ uretim: 'Üretim', sevkiyat: 'Sevkiyat', kalite: 'Kalite', ofis: 'Ofis' }[p.ekip]}</b></div><div><small>Çalışma yeri</small><b>${p.tip}</b></div>
+      ${cm ? `<div><small>Aylık net maaş</small><div class="acts"><input class="inp sm num" id="kmaas" value="${p.maas || 0}" style="width:110px" aria-label="Aylık net maaş"><button class="btn sm alt" id="kmk">Kaydet</button></div></div>` : ''}</div>
+    <div class="grid2e">
+      <div class="card"><h2>Puantaj özeti</h2>${tbl([['Ay'], ['Çalışılan gün', 'r'], ['İzin', 'r'], ['Rapor', 'r'], ['Devamsızlık', 'r'], ['F. mesai', 'r']], aylar.map(a => { const o = puantajOzet(p.id, a); return `<tr><td data-l="Ay">${ayAd(a)}</td><td data-l="Çalışılan" class="r">${o.ucretli} / ${o.ayGun}</td><td data-l="İzin" class="r">${o.izinli}</td><td data-l="Rapor" class="r">${o.rapor}</td><td data-l="Devamsızlık" class="r ${o.gelmedi ? 'bad' : ''}">${o.gelmedi}</td><td data-l="F. mesai" class="r">${nf(o.mesai)} sa</td></tr>`; }))}</div>
+      ${cm ? `<div class="card"><h2>Net ödeme, ${ayAd(bAy)}</h2>
+        <div class="uy"><span>Maaş payı (${n.o.ucretli} / ${n.o.ayGun} gün)</span><b class="num">${money(n.maasPay)}</b></div>
+        <div class="uy"><span>+ Fazla mesai ücreti (${nf(n.o.mesai)} sa)</span><b class="num">${money0(n.fm)}</b></div>
+        ${S.bordroCols.filter(c => n.b[c.k]).map(c => `<div class="uy"><span>${c.tur === 'arti' ? '+' : '−'} ${esc(c.ad)}</span><b class="num ${c.tur === 'arti' ? '' : 'bad'}">${money0(n.b[c.k])}</b></div>`).join('')}
+        <div class="uy"><span><b>Net ödenecek</b></span><b class="num" id="kartNet">${money(n.net)}</b></div>
+        <h3 style="margin:14px 0 8px">Avans, ceza veya ek ödeme ekle</h3>
+        <div class="fg"><label class="f"><span>Ay</span><select class="inp" id="kay">${ayListe().map(a => `<option value="${a}" ${a === bAy ? 'selected' : ''}>${ayAd(a)}</option>`).join('')}</select></label>
+          <label class="f"><span>Kalem</span><select class="inp" id="kk">${S.bordroCols.map(c => `<option value="${c.k}">${c.tur === 'arti' ? '+ ' : '− '}${esc(c.ad)}</option>`).join('')}</select></label>
+          <label class="f"><span>Tutar (₺)</span><input class="inp" id="kt" inputmode="decimal"></label><label class="f"><span>Açıklama</span><input class="inp" id="ka" placeholder="Örn. Ev kirası için avans"></label></div>
+        <button class="btn" id="kekle">Ekle</button></div>` : ''}
+    </div>
+    ${cm ? `<div class="card" style="margin-top:14px"><h2>Avans, ceza ve ek ödeme geçmişi</h2>${logs.map(x => { const c = S.bordroCols.find(c => c.k === x.k) || { ad: x.k, tur: 'arti' }; return `<div class="uy"><span>${trDate(x.tarih)}, ${esc(c.ad)}${x.ack ? ', ' + esc(x.ack) : ''} <span class="small muted">(${ayAd(x.ay)} hesabına)</span></span><b class="num ${c.tur === 'arti' ? '' : 'bad'}">${c.tur === 'arti' ? '+' : '−'}${money0(x.tutar)}</b></div>`; }).join('') || '<p class="empty">Kayıt yok.</p>'}</div>` : ''}`;
+  if (!cm) return;
+  $('#kmk').onclick = () => { p.maas = numIn($('#kmaas').value) || 0; save(); toast('Maaş güncellendi.'); route(); };
+  $('#kekle').onclick = () => { const t = numIn($('#kt').value); if (!(t > 0)) return toast('Tutar girin.'); const ay = $('#kay').value, k = $('#kk').value;
+    const b = S.bordro[ay] = S.bordro[ay] || {}; b[p.id] = b[p.id] || {}; b[p.id][k] = (b[p.id][k] || 0) + t;
+    S.bordroLog.push({ id: 'bl' + Date.now(), pid: p.id, ay, k, tutar: t, tarih: TODAY, ack: $('#ka').value.trim() }); bAy = ay; save(); toast('Kaydedildi; net ödeme hesabına işlendi.'); route(); };
+}
 
 /* ============ RAPORLAR ============ */
+let rapG = 'tur';
 ROUTES.raporlar = function (id) {
-  const R = [['ihale', 'İhale başarı oranı', true], ['teslim', 'Sözleşme teslim durumu', true], ['maliyet', 'Ürün ve parti maliyeti', M], ['tuketim', 'Hammadde tüketimi', true], ['yaslandirma', 'Alacak yaşlandırma', F], ['karlilik', 'Sözleşme kârlılığı', M]].filter(r => r[2]);
+  const R = [['ihale', 'İhale başarı oranı', true], ['teslim', 'Sözleşme teslim durumu', true], ['gelir', 'Gelir (fatura türüne göre)', F], ['nakliye', 'Nakliye maliyet oranı', F], ['teminat', 'Teminat durumu', F], ['maliyet', 'Ürün ve parti maliyeti', M], ['tuketim', 'Hammadde tüketimi', true], ['yaslandirma', 'Alacak yaşlandırma', F], ['karlilik', 'Sözleşme kârlılığı', M]].filter(r => r[2]);
   const tab = R.some(r => r[0] === id) ? id : R[0][0];
   const bar = (o, c) => `<div class="bar"><i style="width:${Math.max(0, Math.min(100, o * 100)).toFixed(1)}%;${c ? 'background:' + c : ''}"></i></div>`;
   let head = [], rows = [], viz = '';
-  if (tab === 'ihale') {
+  const gSeg = opts => `<div class="seg" id="rgSeg">${opts.map(([k, ad]) => `<button data-rg="${k}" class="${rapG === k ? 'on' : ''}">${ad}</button>`).join('')}</div>`;
+  if (tab === 'ihale' && rapG === 'sozlesme') rapG = 'tur';
+  if (tab === 'ihale' && rapG === 'tur') {
+    const ih = S.ihaleler.filter(inSir);
+    head = ['İş türü', 'Katılınan', 'Kazanılan', 'Kaybedilen', 'Sonuç bekleyen', 'Başarı oranı %', ...(F ? ['Kazanılan tutar ₺'] : [])];
+    rows = Object.entries(TUR).map(([t, ad]) => { const l = ih.filter(i => i.tur === t && i.durum !== 'hazirlaniyor'); const kz = l.filter(i => i.durum === 'kazanildi'), ky = l.filter(i => i.durum === 'kaybedildi');
+      return [ad, l.length, kz.length, ky.length, l.length - kz.length - ky.length, kz.length + ky.length ? Math.round(kz.length / (kz.length + ky.length) * 100) : 0, ...(F ? [Math.round(kz.reduce((a, i) => a + ihaleTutar(i), 0))] : [])]; });
+    viz = gSeg([['tur', 'Türe göre'], ['kurum', 'Kuruma göre']]) + `<div class="hbar">${rows.map(r => `<span>${esc(r[0])}</span>${bar(r[5] / 100, 'var(--ok)')}<span class="num">%${r[5]}</span>`).join('')}</div>`;
+  } else if (tab === 'ihale') {
     const ih = S.ihaleler.filter(inSir);
     head = ['Kurum', 'Katılınan', 'Kazanılan', 'Kaybedilen', 'Sonuç bekleyen', 'Başarı oranı %', ...(F ? ['Kazanılan tutar ₺'] : [])];
     rows = S.kurumlar.map(k => { const l = ih.filter(i => i.k === k.id && i.durum !== 'hazirlaniyor'); if (!l.length) return null; const kz = l.filter(i => i.durum === 'kazanildi'), ky = l.filter(i => i.durum === 'kaybedildi');
       return [k.ad, l.length, kz.length, ky.length, l.length - kz.length - ky.length, kz.length + ky.length ? Math.round(kz.length / (kz.length + ky.length) * 100) : 0, ...(F ? [Math.round(kz.reduce((t, i) => t + ihaleTutar(i), 0))] : [])]; }).filter(Boolean);
     const kz = ih.filter(i => i.durum === 'kazanildi').length, ky = ih.filter(i => i.durum === 'kaybedildi').length;
-    viz = `<p style="margin-bottom:10px">Sonuçlanan ${kz + ky} ihalenin <b>${kz}</b> tanesi kazanıldı: başarı oranı <b>%${kz + ky ? Math.round(kz / (kz + ky) * 100) : 0}</b>.</p><div class="hbar">${rows.map(r => `<span>${esc(r[0])}</span>${bar(r[5] / 100, 'var(--ok)')}<span class="num">%${r[5]}</span>`).join('')}</div>`;
+    viz = gSeg([['tur', 'Türe göre'], ['kurum', 'Kuruma göre']]) + `<p style="margin-bottom:10px">Sonuçlanan ${kz + ky} ihalenin <b>${kz}</b> tanesi kazanıldı: başarı oranı <b>%${kz + ky ? Math.round(kz / (kz + ky) * 100) : 0}</b>.</p><div class="hbar">${rows.map(r => `<span>${esc(r[0])}</span>${bar(r[5] / 100, 'var(--ok)')}<span class="num">%${r[5]}</span>`).join('')}</div>`;
   }
   if (tab === 'teslim') {
-    head = ['Sözleşme', 'Kurum', 'Teslim %', 'Sonraki teslim', 'Kesin teminat'];
-    rows = S.sozlesmeler.filter(inSir).map(z => { const nx = z.plan.find(p => p.tarih >= TODAY); return [z.no, kurum(z.k).ad, Math.round(sozOran(z) * 100), sozBitti(z) ? 'Tamamlandı' : nx ? trDate(nx.tarih) : 'Takvim geçti', z.kesin.iade ? 'İade alındı' : 'Kurumda']; });
+    head = ['Sözleşme', 'Kurum', 'Teslim %', 'Sonraki teslim', 'Tür', 'Kesin teminat'];
+    rows = S.sozlesmeler.filter(inSir).map(z => { const nx = z.plan.find(p => p.tarih >= TODAY); return [z.no, kurum(z.k).ad, Math.round(sozOran(z) * 100), sozBitti(z) ? 'Tamamlandı' : nx ? trDate(nx.tarih) : 'Takvim geçti', turAd(z.tur), !z.kesin ? 'Yok' : z.kesin.iade ? 'İade alındı' : 'Kurumda']; });
     viz = `<div class="hbar">${rows.map(r => `<span>${esc(r[0])}<span class="small muted"> ${esc(r[1])}</span></span>${bar(r[2] / 100, r[2] >= 100 ? 'var(--ok)' : '')}<span class="num">%${r[2]}</span>`).join('')}</div>`;
   }
   if (tab === 'maliyet') {
@@ -432,17 +642,47 @@ ROUTES.raporlar = function (id) {
       <div class="hbar">${rows.map(r => `<span>${esc(r[0])}</span><div class="stack" style="width:${(r[5] / mx * 100).toFixed(1)}%">${[1, 2, 3, 4].map(i => r[i] ? `<i style="width:${(r[i] / r[5] * 100).toFixed(1)}%;background:${C[i - 1]}"></i>` : '').join('')}</div><span class="num">${money0(r[5])}</span>`).join('')}</div>`;
   }
   if (tab === 'karlilik') {
-    head = ['Sözleşme', 'Kurum', 'Teslim edilen ₺', 'Ürün maliyeti ₺', 'Nakliye ₺', 'Brüt kâr ₺', 'Marj %'];
+    head = ['Sözleşme', 'Kurum', 'Teslim edilen ₺', 'Ürün maliyeti ₺', 'Nakliye ₺', 'İhale giderleri ₺', 'Brüt kâr ₺', 'Marj %'];
     rows = S.sozlesmeler.filter(inSir).map(z => { const svs = S.sevkiyatlar.filter(v => v.szId === z.id), t = svs.filter(v => v.durum === 'teslim'); const c = t.reduce((a, v) => a + svCiro(v), 0), um = t.reduce((a, v) => a + svUrunMaliyet(v), 0), nk = svs.reduce((a, v) => a + v.nakliye.bedel, 0);
-      return [z.no, kurum(z.k).ad, Math.round(c), Math.round(um), Math.round(nk), Math.round(c - um - nk), c ? Math.round((c - um - nk) / c * 100) : 0]; });
-    viz = `<div class="hbar">${rows.map(r => `<span>${esc(r[0])}<span class="small muted"> ${esc(r[1])}</span></span>${bar(r[6] / 100, 'var(--ok)')}<span class="num">%${r[6]}</span>`).join('')}</div>`;
+      const ig = ihGider(ihale(z.ihId)); return [z.no, kurum(z.k).ad, Math.round(c), Math.round(um), Math.round(nk), Math.round(ig), Math.round(c - um - nk - ig), c ? Math.round((c - um - nk - ig) / c * 100) : 0]; });
+    viz = `<div class="hbar">${rows.map(r => `<span>${esc(r[0])}<span class="small muted"> ${esc(r[1])}</span></span>${bar(Math.max(0, r[7]) / 100, 'var(--ok)')}<span class="num">%${r[7]}</span>`).join('')}</div>`;
   }
-  const fmt = (v, i) => typeof v === 'number' && i > 0 ? (/₺/.test(head[i]) ? money0(v) : nf(v)) : esc(v);
+  if (tab === 'gelir') {
+    const ft = S.faturalar.filter(inSir);
+    head = ['Fatura türü', 'Fatura sayısı', 'Fatura toplamı (KDV dahil) ₺', 'Gelir yazılan (KDV hariç) ₺', 'Açıklama'];
+    rows = Object.entries(FATURA_TUR).map(([t, ad]) => { const l = ft.filter(f => f.tur === t); return [ad, l.length, Math.round(l.reduce((a, f) => a + f.toplam, 0)), Math.round(l.reduce((a, f) => a + gelir(f), 0)), t === 'komisyon' ? 'Fatura bedeli emanettir; yalnız komisyon gelir' : 'Matrah (KDV hariç)']; });
+    const top = rows.reduce((a, r) => a + r[3], 0), mx = Math.max(...rows.map(r => r[2]), 1);
+    viz = `<p style="margin-bottom:10px">Toplam gelir <b>${money0(top)}</b>. Komisyon işlerinde kuruma kesilen fatura tutarı gelire eklenmez.</p>
+      <div class="legend"><span style="--c:var(--line-2)">Fatura toplamı</span><span style="--c:var(--pet)">Gelir yazılan</span></div>
+      <div class="hbar">${rows.map(r => `<span>${esc(r[0])}</span><div class="bar" style="width:${(r[2] / mx * 100).toFixed(1)}%"><i style="width:${r[2] ? (r[3] / r[2] * 100).toFixed(1) : 0}%"></i></div><span class="num">${money0(r[3])}</span>`).join('')}</div>`;
+  }
+  if (tab === 'nakliye') {
+    if (!['tur', 'kurum', 'sozlesme'].includes(rapG)) rapG = 'tur';
+    const svs = S.sevkiyatlar.filter(inSir), key = { tur: v => turAd(soz(v.szId).tur), kurum: v => kurum(v.k).ad, sozlesme: v => soz(v.szId).no }[rapG];
+    const g = {}; svs.forEach(v => { const k = key(v); g[k] = g[k] || [0, 0, 0, 0, 0]; g[k][0]++; g[k][1] += svCiro(v); g[k][2] += v.nakliye.tasima || 0; g[k][3] += v.nakliye.hamaliye || 0; g[k][4] += v.nakliye.forklift || 0; });
+    head = [{ tur: 'İş türü', kurum: 'Kurum / müşteri', sozlesme: 'Sözleşme' }[rapG], 'Sevkiyat', 'Ana fatura tutarı ₺', 'Taşıma ₺', 'Hamaliye ₺', 'Forklift ₺', 'Toplam nakliye ₺', 'Oran %'];
+    rows = Object.entries(g).map(([k, a]) => { const t = a[2] + a[3] + a[4]; return [k, a[0], Math.round(a[1]), Math.round(a[2]), Math.round(a[3]), Math.round(a[4]), Math.round(t), a[1] ? Math.round(t / a[1] * 1000) / 10 : 0]; }).sort((a, b) => b[7] - a[7]);
+    const mx = Math.max(...rows.map(r => r[7]), 1);
+    viz = gSeg([['tur', 'Türe göre'], ['kurum', 'Kuruma göre'], ['sozlesme', 'Sözleşmeye göre']]) + `<p class="small muted" style="margin-bottom:8px">Oran = (taşıma + hamaliye + forklift) / ana fatura tutarı (KDV hariç). Hazırlanan ve yoldaki sevkiyatlar dahil.</p>
+      <div class="hbar">${rows.map(r => `<span>${esc(r[0])}</span>${bar(r[7] / mx * 0.95, r[7] > 10 ? 'var(--bad)' : '')}<span class="num">%${nf(r[7], 1)}</span>`).join('')}</div>`;
+  }
+  if (tab === 'teminat') {
+    const tl = teminatlar().filter(x => inSir(x) && !x.t.iade);
+    head = ['Kurum', 'Kurumdaki teminat sayısı', 'Kurumda bekleyen ₺', 'İade edilebilir ₺', 'Unutulan (30+ gün) ₺', 'En eski bekleme (gün)'];
+    rows = S.kurumlar.map(k => { const l = tl.filter(x => x.k === k.id); if (!l.length) return null; const ie = l.filter(x => x.iadeEd), un = l.filter(x => x.unutuldu);
+      return [k.ad, l.length, Math.round(l.reduce((a, x) => a + x.t.tutar, 0)), Math.round(ie.reduce((a, x) => a + x.t.tutar, 0)), Math.round(un.reduce((a, x) => a + x.t.tutar, 0)), ie.length ? Math.max(...ie.map(x => x.bekleme)) : 0]; }).filter(Boolean).sort((a, b) => b[5] - a[5]);
+    const mx = Math.max(...rows.map(r => r[2]), 1);
+    viz = `<p style="margin-bottom:10px">Kurumlarda bekleyen toplam teminat <b>${money0(rows.reduce((a, r) => a + r[2], 0))}</b>; bunun <b class="bad">${money0(rows.reduce((a, r) => a + r[4], 0))}</b> kadarı iade edilebilir olduğu hâlde 30 günden uzun süredir bekliyor.</p>
+      <div class="legend"><span style="--c:var(--pet)">Kurumda bekleyen</span><span style="--c:var(--bad)">Unutulan</span></div>
+      <div class="hbar">${rows.map(r => `<span>${esc(r[0])}</span><div class="stack" style="width:${(r[2] / mx * 100).toFixed(1)}%"><i style="width:${((r[2] - r[4]) / r[2] * 100).toFixed(1)}%;background:var(--pet)"></i><i style="width:${(r[4] / r[2] * 100).toFixed(1)}%;background:var(--bad)"></i></div><span class="num">${money0(r[2])}</span>`).join('')}</div>`;
+  }
+  const fmt = (v, i) => typeof v === 'number' && i > 0 ? (/₺/.test(head[i]) ? money0(v) : /%/.test(head[i]) ? nf(v, 1) : nf(v)) : esc(v);
   view.innerHTML = `<div class="hd"><div><h1>Raporlar</h1><p>${aktifSir() === 'hepsi' ? 'Tüm şirketler, konsolide.' : esc(sirket(aktifSir()).ad) + (sirket(aktifSir()).ad.endsWith('.') ? '' : '.')} Her rapor Excel'e aktarılabilir.</p></div><button class="btn alt" id="csv">Excel'e aktar</button></div>
     ${tabsHtml(R.map(r => [r[0], r[1]]), tab)}
     <div class="card"><h2>${R.find(r => r[0] === tab)[1]}</h2>${viz}</div>
     <div class="card">${tbl(head.map((h, i) => [h, i > 0 && rows[0] && typeof rows[0][i] === 'number' ? 'r' : '']), rows.map(r => `<tr>${r.map((v, i) => `<td data-l="${esc(head[i])}" class="${typeof v === 'number' && i > 0 ? 'r num' : ''}">${fmt(v, i)}</td>`).join('')}</tr>`))}</div>`;
   bindTabs('raporlar');
+  $$('[data-rg]').forEach(b => b.onclick = () => { rapG = b.dataset.rg; route(); });
   $('#csv').onclick = () => { csvIndir('cozum-grup-' + tab + '-' + TODAY, [head, ...rows.map(r => r.map(v => typeof v === 'number' ? String(v).replace('.', ',') : v))]); toast('Rapor CSV olarak indirildi; Excel ile açılır.'); };
 };
 
