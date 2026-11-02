@@ -1,5 +1,5 @@
 /* Çözüm Grup Yönetim, tıklanabilir demo. Tüm veriler yalnız bu tarayıcıda (localStorage) saklanır. */
-const KEY = 'cozum-grup-demo-v4';
+const KEY = 'cozum-grup-demo-v5';
 const SKEY = 'cozum-grup-oturum';
 const PROTO = 'Bu bir ön prototiptir, hazır paket yazılım değildir. Program, firmanızın iş akışına göre size özel geliştirilir; ekranlar ve alanlar sizinle birlikte netleştirilir.';
 
@@ -168,7 +168,9 @@ function seed() {
 
   /* personel */
   const MAAS = { pr1: 58000, pr2: 36000, pr3: 33000, pr4: 34000, pr5: 33000, pr6: 32000, pr7: 48000, pr8: 42000, pr9: 46000, pr10: 45000, pr11: 41000, pr12: 39000, pr13: 36000, pr14: 33000, pr15: 35000 };
-  const P = (id, ad, gorev, tip, ekip, sir) => ({ id, ad, gorev, tip, ekip, sir, aktif: true, maas: MAAS[id] });
+  const BNK = [['00062', 'Garanti BBVA'], ['00012', 'Halkbank'], ['00010', 'Ziraat Bankası'], ['00015', 'VakıfBank'], ['00064', 'İş Bankası']];
+  const P = (id, ad, gorev, tip, ekip, sir) => { const n = +id.slice(2), b = BNK[n % BNK.length];
+    return { id, ad, gorev, tip, ekip, sir, aktif: true, maas: MAAS[id], iban: id === 'pr4' ? '' : ibanUret(b[0], String(41000000 + n * 7919).padStart(16, '0')), banka: id === 'pr4' ? '' : b[1], hesapSahibi: id === 'pr4' ? '' : ad }; };
   s.personel = [
     P('pr1', 'Murat Kaya', 'Üretim şefi', 'Fabrika', 'uretim', 's1'),
     P('pr2', 'Ali Rıza Polat', 'Reaktör operatörü', 'Fabrika', 'uretim', 's1'),
@@ -406,6 +408,17 @@ function mkFatura(s, sv, tarih) {
   const f = { id: 'f' + (++s.seq.fat), no: 'CZF2026000000' + s.seq.fat, tur: { acik: 'ihale', dogrudan: 'dogrudan', piyasa: 'piyasa' }[sz.tur || 'acik'], sir: sv.sir, svId: sv.id, szId: sv.szId, k: sv.k, tarih, vade: addDays(tarih, k.vade), matrah, kdv: matrah * 0.2, toplam: matrah * 1.2, tahsilat: [] };
   sv.faturaId = f.id; s.faturalar.push(f); return f;
 }
+function mod97(str) { let r = 0; for (const ch of str) r = (r * 10 + +ch) % 97; return r; }
+const ibanSayisal = t => t.replace(/[A-Z]/g, c => String(c.charCodeAt(0) - 55));
+function ibanUret(banka, hesap) { const bban = banka + '0' + hesap; const k = 98 - mod97(ibanSayisal(bban + 'TR00')); return 'TR' + String(k).padStart(2, '0') + bban; }
+function ibanKontrol(v) {
+  const t = String(v || '').replace(/\s+/g, '').toUpperCase();
+  if (!t) return { ok: false, hata: 'IBAN boş.' };
+  if (!/^TR\d{24}$/.test(t)) return { ok: false, hata: 'IBAN "TR" ile başlamalı ve ardından 24 rakam gelmeli (toplam 26 karakter).' };
+  if (mod97(ibanSayisal(t.slice(4) + t.slice(0, 4))) !== 1) return { ok: false, hata: 'IBAN kontrol hanesi tutmuyor; numarayı kontrol edin.' };
+  return { ok: true, iban: t };
+}
+const ibanGoster = v => v ? String(v).replace(/\s+/g, '').replace(/(.{4})/g, '$1 ').trim() : '';
 function mkKomisyon(s, o) {
   const k = s.kurumlar.find(x => x.id === o.k);
   const f = { id: 'f' + (++s.seq.fat), no: 'CZF2026000000' + s.seq.fat, tur: 'komisyon', sir: o.sir, svId: null, szId: null, k: o.k, konu: o.konu, tedAd: o.tedAd, tarih: o.tarih, vade: addDays(o.tarih, k.vade),

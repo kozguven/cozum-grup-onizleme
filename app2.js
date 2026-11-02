@@ -565,16 +565,17 @@ ROUTES.personel = function (id) {
     const ns = ps.map(p => ({ p, n: netOdeme(p, bAy) })), sum = f => ns.reduce((t, x) => t + f(x), 0);
     const inp = (p, c, n) => `<td class="r"><input class="inp sm num" data-bc="${p.id}|${c.k}" value="${n.b[c.k] || ''}" placeholder="0" style="width:84px" aria-label="${esc(p.ad)} ${esc(c.ad)}"></td>`;
     body = `<div class="acts" style="margin-bottom:12px"><label class="small" for="bay">Ay</label><select class="inp sm" id="bay">${ayListe().map(a => `<option value="${a}" ${a === bAy ? 'selected' : ''}>${ayAd(a)}</option>`).join('')}</select>
-        <button class="btn sm alt" id="bcol">Sütun ekle</button><button class="btn sm alt" id="bcsv">Excel'e aktar</button></div>
+        <button class="btn sm alt" id="bcol">Sütun ekle</button><button class="btn sm alt" id="bcsv">Excel'e aktar</button><button class="btn sm" id="bbanka">Banka ödeme listesi</button></div>
+      ${ps.some(p => !ibanKontrol(p.iban).ok) ? `<div class="note w" id="ibanEksik"><b>IBAN'ı eksik veya hatalı personel:</b> ${ps.filter(p => !ibanKontrol(p.iban).ok).map(p => `<a href="#personel/kart-${p.id}">${esc(p.ad)}</a>`).join(', ')}. Banka ödeme listesine alınmazlar.</div>` : ''}
       <p class="small muted yatay" style="margin-bottom:6px">Tabloyu yana kaydırarak artı, kesinti ve net ödeme sütunlarını görün.</p>
       <div class="tw"><table class="t" id="bordro"><thead><tr><th>Personel</th><th class="r">Aylık net maaş</th><th class="r">Çalışılan gün</th><th class="r">İzin</th><th class="r">Rapor</th><th class="r">Devamsızlık</th><th class="r">F. mesai (sa)</th><th class="r">Maaş payı</th><th class="r ok">+ F. mesai ücreti</th>
-        ${artiC.map(c => `<th class="r ok">+ ${esc(c.ad)}</th>`).join('')}${kesC.map(c => `<th class="r bad">− ${esc(c.ad)}</th>`).join('')}<th class="r">Net ödenecek</th></tr></thead><tbody>
-        ${ns.map(({ p, n }) => `<tr><td class="nowrap"><a href="#personel/kart-${p.id}">${esc(p.ad)}</a><div class="small muted">${esc(p.gorev)}</div></td><td class="r num">${money0(p.maas)}</td>
+        ${artiC.map(c => `<th class="r ok">+ ${esc(c.ad)}</th>`).join('')}${kesC.map(c => `<th class="r bad">− ${esc(c.ad)}</th>`).join('')}<th class="r">Net ödenecek</th><th>Maaş IBAN'ı</th></tr></thead><tbody>
+        ${ns.map(({ p, n }) => `<tr><td class="nowrap"><a href="#personel/kart-${p.id}">${esc(p.ad)}</a><div class="small muted">${esc(p.gorev)}</div><div class="small num ${ibanKontrol(p.iban).ok ? 'muted' : 'bad'}" data-ibm="${p.id}">${ibanKontrol(p.iban).ok ? ibanGoster(p.iban) : 'IBAN eksik'}</div></td><td class="r num">${money0(p.maas)}</td>
           <td class="r">${n.o.ucretli} / ${n.o.ayGun}</td><td class="r">${n.o.izinli}</td><td class="r">${n.o.rapor}</td><td class="r ${n.o.gelmedi ? 'bad' : ''}">${n.o.gelmedi}</td><td class="r">${nf(n.o.mesai)}</td>
           <td class="r num">${money(n.maasPay)}</td><td class="r num">${money0(n.fm)}</td>${artiC.map(c => inp(p, c, n)).join('')}${kesC.map(c => inp(p, c, n)).join('')}
-          <td class="r num"><b data-net="${p.id}">${money(n.net)}</b></td></tr>`).join('')}</tbody>
+          <td class="r num"><b data-net="${p.id}">${money(n.net)}</b></td><td class="small nowrap num ${ibanKontrol(p.iban).ok ? '' : 'bad'}" data-iban="${p.id}">${ibanKontrol(p.iban).ok ? ibanGoster(p.iban) + `<div class="muted">${esc(p.banka || '')}</div>` : 'Eksik'}</td></tr>`).join('')}</tbody>
         <tfoot><tr><td>Toplam (${ns.length} kişi)</td><td class="r num">${money0(sum(x => x.p.maas))}</td><td colspan="5"></td><td class="r num">${money0(sum(x => x.n.maasPay))}</td><td class="r num">${money0(sum(x => x.n.fm))}</td>
-          ${artiC.concat(kesC).map(c => `<td class="r num">${money0(sum(x => x.n.b[c.k] || 0))}</td>`).join('')}<td class="r num" id="netTop">${money(sum(x => x.n.net))}</td></tr></tfoot></table></div>
+          ${artiC.concat(kesC).map(c => `<td class="r num">${money0(sum(x => x.n.b[c.k] || 0))}</td>`).join('')}<td class="r num" id="netTop">${money(sum(x => x.n.net))}</td><td></td></tr></tfoot></table></div>
       <p class="small muted" style="margin-top:8px"><b>Net ödeme hesabıdır; resmî SGK ve vergi bordrosu değildir.</b> Net ödenecek = maaş × (çalışılan gün / ay gün sayısı) + artılar − kesintiler. Çalışılan gün = ay gün sayısı − devamsızlık − rapor (hafta tatili ve yıllık izin ücretli sayılır). Fazla mesai ücreti = saat × (maaş / 225) × 1,5. Avans ve cezalar personel kartından da girilir.</p>`;
   }
   view.innerHTML = `<div class="hd"><div><h1>Personel ve puantaj</h1><p>${ME.ekip ? 'Ekibinizin' : 'Fabrika, ofis ve şoför personelinin'} günlük puantajı ve iş takibi${cm ? ', aylık net ödeme hesabı' : ''}.${ME.ekip ? ' Yalnız kendi ekibinizi görürsünüz.' : ''}</p></div></div>
@@ -592,6 +593,9 @@ ROUTES.personel = function (id) {
   }));
   on('#bcsv', () => { const cols = S.bordroCols; csvIndir('net-odeme-' + bAy, [['Personel', 'Görev', 'Aylık net maaş', 'Çalışılan gün', 'Ay gün', 'İzin', 'Rapor', 'Devamsızlık', 'Fazla mesai saat', 'Maaş payı', 'Fazla mesai ücreti', ...cols.map(c => (c.tur === 'arti' ? '+ ' : '- ') + c.ad), 'Net ödenecek'],
     ...ps.map(p => { const n = netOdeme(p, bAy); return [p.ad, p.gorev, p.maas, n.o.ucretli, n.o.ayGun, n.o.izinli, n.o.rapor, n.o.gelmedi, n.o.mesai, n.maasPay.toFixed(2).replace('.', ','), n.fm, ...cols.map(c => n.b[c.k] || 0), n.net.toFixed(2).replace('.', ',')]; })]); toast('Net ödeme tablosu CSV olarak indirildi.'); });
+  on('#bbanka', () => { const ok2 = ps.filter(p => ibanKontrol(p.iban).ok), eks = ps.filter(p => !ibanKontrol(p.iban).ok), ack = ayAd(bAy).replace(/^./, c => c.toLocaleUpperCase('tr-TR')) + ' maaş';
+    csvIndir('banka-odeme-listesi-' + bAy, [['Ad soyad', 'Hesap sahibi', 'Banka', 'IBAN', 'Net tutar', 'Açıklama'], ...ok2.map(p => [p.ad, p.hesapSahibi || p.ad, p.banka || '', ibanKontrol(p.iban).iban, netOdeme(p, bAy).net.toFixed(2).replace('.', ','), ack])]);
+    toast(eks.length ? `Banka ödeme listesi indirildi (${ok2.length} kişi). IBAN'ı eksik: ${eks.map(p => p.ad).join(', ')}; listeye alınmadı.` : `Banka ödeme listesi indirildi (${ok2.length} kişi).`); });
   on('#hepGeldi', () => $$('[data-pd]').forEach(s => { if (!s.value) s.value = 'geldi'; }));
   on('#puKaydet', () => { const pz = S.puantaj[puTarih] = S.puantaj[puTarih] || {}; $$('[data-pd]').forEach(s => { const pid = s.dataset.pd; if (s.value) pz[pid] = { d: s.value, mesai: numIn($(`[data-pm="${pid}"]`).value) || 0 }; else delete pz[pid]; }); save(); toast('Puantaj kaydedildi.'); route(); });
   $$('[data-is]').forEach(c => c.onchange = () => { S.isler.find(x => x.id === c.dataset.is).yapildi = c.checked; save(); route(); });
@@ -614,7 +618,12 @@ function personelKart(pid) {
   view.innerHTML = `<a class="back" href="#personel/liste">Personel listesine dön</a>
     <div class="hd"><div><h1>${esc(p.ad)}</h1><p>${esc(p.gorev)}, ${p.tip}, ${esc(sirket(p.sir).kisa)}</p></div></div>
     <div class="meta"><div><small>Ekip</small><b>${{ uretim: 'Üretim', sevkiyat: 'Sevkiyat', kalite: 'Kalite', ofis: 'Ofis' }[p.ekip]}</b></div><div><small>Çalışma yeri</small><b>${p.tip}</b></div>
-      ${cm ? `<div><small>Aylık net maaş</small><div class="acts"><input class="inp sm num" id="kmaas" value="${p.maas || 0}" style="width:110px" aria-label="Aylık net maaş"><button class="btn sm alt" id="kmk">Kaydet</button></div></div>` : ''}</div>
+      ${cm ? `<div><small>Aylık net maaş</small><div class="acts"><input class="inp sm num" id="kmaas" value="${p.maas || 0}" style="width:110px" aria-label="Aylık net maaş"><button class="btn sm alt" id="kmk">Kaydet</button></div></div>
+      <div><small>Maaş IBAN'ı</small><b class="num ${ibanKontrol(p.iban).ok ? '' : 'bad'}" id="kIbanG">${ibanKontrol(p.iban).ok ? ibanGoster(p.iban) : 'Eksik'}</b><div class="small muted">${esc(p.banka || '')}${p.hesapSahibi ? ', ' + esc(p.hesapSahibi) : ''}</div></div>` : ''}</div>
+    ${cm ? `<div class="card" style="margin-bottom:14px"><h2>Maaş hesabı</h2><div class="fg">
+      <label class="f" style="grid-column:1/-1"><span>Maaş IBAN'ı (TR + 24 hane)</span><input class="inp num" id="kIban" value="${esc(ibanGoster(p.iban))}" placeholder="TR00 0000 0000 0000 0000 0000 00" autocomplete="off"></label>
+      <label class="f"><span>Banka</span><input class="inp" id="kBanka" value="${esc(p.banka || '')}" placeholder="Örn. Ziraat Bankası"></label><label class="f"><span>Hesap sahibi</span><input class="inp" id="kSahip" value="${esc(p.hesapSahibi || p.ad)}"></label></div>
+      <p class="small bad hide" id="kIbanErr" style="margin-bottom:8px"></p><button class="btn sm" id="kIbanK">Hesap bilgisini kaydet</button></div>` : ''}
     <div class="grid2e">
       <div class="card"><h2>Puantaj özeti</h2>${tbl([['Ay'], ['Çalışılan gün', 'r'], ['İzin', 'r'], ['Rapor', 'r'], ['Devamsızlık', 'r'], ['F. mesai', 'r']], aylar.map(a => { const o = puantajOzet(p.id, a); return `<tr><td data-l="Ay">${ayAd(a)}</td><td data-l="Çalışılan" class="r">${o.ucretli} / ${o.ayGun}</td><td data-l="İzin" class="r">${o.izinli}</td><td data-l="Rapor" class="r">${o.rapor}</td><td data-l="Devamsızlık" class="r ${o.gelmedi ? 'bad' : ''}">${o.gelmedi}</td><td data-l="F. mesai" class="r">${nf(o.mesai)} sa</td></tr>`; }))}</div>
       ${cm ? `<div class="card"><h2>Net ödeme, ${ayAd(bAy)}</h2>
@@ -630,6 +639,9 @@ function personelKart(pid) {
     </div>
     ${cm ? `<div class="card" style="margin-top:14px"><h2>Avans, ceza ve ek ödeme geçmişi</h2>${logs.map(x => { const c = S.bordroCols.find(c => c.k === x.k) || { ad: x.k, tur: 'arti' }; return `<div class="uy"><span>${trDate(x.tarih)}, ${esc(c.ad)}${x.ack ? ', ' + esc(x.ack) : ''} <span class="small muted">(${ayAd(x.ay)} hesabına)</span></span><b class="num ${c.tur === 'arti' ? '' : 'bad'}">${c.tur === 'arti' ? '+' : '−'}${money0(x.tutar)}</b></div>`; }).join('') || '<p class="empty">Kayıt yok.</p>'}</div>` : ''}`;
   if (!cm) return;
+  $('#kIban').oninput = e => { const pos = e.target.value.length; e.target.value = ibanGoster(e.target.value.replace(/\s+/g, '').toUpperCase()); };
+  $('#kIbanK').onclick = () => { const r = ibanKontrol($('#kIban').value); if (!r.ok) { $('#kIbanErr').textContent = r.hata; $('#kIbanErr').classList.remove('hide'); return; }
+    p.iban = r.iban; p.banka = $('#kBanka').value.trim(); p.hesapSahibi = $('#kSahip').value.trim() || p.ad; save(); toast('Maaş hesabı kaydedildi.'); route(); };
   $('#kmk').onclick = () => { p.maas = numIn($('#kmaas').value) || 0; save(); toast('Maaş güncellendi.'); route(); };
   $('#kekle').onclick = () => { const t = numIn($('#kt').value); if (!(t > 0)) return toast('Tutar girin.'); const ay = $('#kay').value, k = $('#kk').value;
     const b = S.bordro[ay] = S.bordro[ay] || {}; b[p.id] = b[p.id] || {}; b[p.id][k] = (b[p.id][k] || 0) + t;
